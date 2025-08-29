@@ -9,11 +9,11 @@
   },
   "rewrites": [
     {
-      "source": "/webhook/fapy",
+      "source": "/webhook",
       "destination": "/api/webhook"
     },
     {
-      "source": "/health",
+      "source": "/healthcheck",
       "destination": "/api/health"
     }
   ]
