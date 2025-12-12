@@ -1,6 +1,7 @@
 import { getChainFromChainId } from './utils/rpcs';
 import { fetchFraxPools, fetchGauges, fetchPools, fetchSubgraph } from './crv.fetcher';
 import { isCurveStrategy, computeCurveLikeForwardAPY } from './crv-like.forward';
+import { isVeloLikeVault, computeVeloLikeForwardAPY } from './velo-like.forward';
 import { GqlStrategy, GqlVault } from './types/kongTypes';
 
 export interface VaultAPY {
@@ -14,6 +15,7 @@ export interface VaultAPY {
   cvxAPR?: number;
   rewardsAPY?: number;
   keepCRV?: number;
+  keepVelo?: number;
   v3OracleCurrentAPR?: number;
   v3OracleStratRatioAPR?: number;
 }
@@ -26,6 +28,18 @@ export async function computeChainAPY(
   const chain = getChainFromChainId(chainId)?.name?.toLowerCase();
 
   if (!chain) return null;
+
+  const assetAddress = vault.asset?.address as `0x${string}`;
+  if (assetAddress) {
+    const [, isVeloLike] = await isVeloLikeVault(chainId, assetAddress);
+    if (isVeloLike) {
+      return await computeVeloLikeForwardAPY({
+        vault,
+        allStrategiesForVault: strategies,
+        chainId,
+      });
+    }
+  }
 
   const [gauges, pools, subgraph, fraxPools] = await Promise.all([
     fetchGauges(),

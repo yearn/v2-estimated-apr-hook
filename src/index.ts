@@ -11,6 +11,7 @@ export type VaultFapy = {
   rewardsAPY?: number;
   cvxAPR?: number;
   keepCRV?: number;
+  keepVelo?: number;
 };
 
 export async function computeVaultFapy(
@@ -40,6 +41,7 @@ export async function computeVaultFapy(
       rewardsAPY: fapy.rewardsAPY,
       cvxAPR: fapy.cvxAPR,
       keepCRV: fapy.keepCRV,
+      keepVelo: fapy.keepVelo,
     };
   } catch (error) {
     console.log("error", error)

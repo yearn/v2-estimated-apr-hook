@@ -212,7 +212,6 @@ query Strategy($chainId: Int, $address: String) {
           priceUsd
           priceSource
           blockNumber
-          blockTime
         }
       }
     `;

@@ -60,3 +60,15 @@ export const V3_ORACLE_ADDRESS: Record<number, `0x${string}`> = {
   137: '0x0000000000000000000000000000000000000000',
   250: '0x0000000000000000000000000000000000000000',
 }
+
+// Velodrome/Aerodrome Voter Registries
+export const VELO_STAKING_POOLS_REGISTRY: Record<number, `0x${string}`> = {
+  10: '0x41C914ee0c7E1A5edCD0295623e6dC557B5aBf3C', // Velodrome on Optimism
+  8453: '0x16613524e02ad97eDfeF371bC883F2F5d6C480A5', // Aerodrome on Base
+}
+
+// Velodrome/Aerodrome Token Addresses
+export const VELO_TOKEN_ADDRESS: Record<number, `0x${string}`> = {
+  10: '0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db', // VELO on Optimism
+  8453: '0x940181a94A35A4569E4529A3CDfB74e38FD98631', // AERO on Base
+}

@@ -1,0 +1,9 @@
+export const veloVoterRegistryAbi = [
+  {
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'gauges',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
