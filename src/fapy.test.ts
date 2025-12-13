@@ -125,4 +125,21 @@ describe('Calculate FAPY', () => {
             expect(ydaemonFAPY.composite.rewardsAPR).toBeCloseTo(res?.rewardsAPY ?? 0, 0.01)
         }, 10000)
     })
+
+    describe.concurrent("velo like vaults", () => {
+        it('should calculate fapy for Velodrome vault 0xDdDCAeE873f2D9Df0E18a80709ef2B396d4a6EA5', async () => {
+            const chainId = 10
+            const vaultAddress = '0xDdDCAeE873f2D9Df0E18a80709ef2B396d4a6EA5'
+            const [res, ydaemonFAPY] = await Promise.all([
+                computeVaultFapy(chainId, vaultAddress),
+                getYDaemonFAPY(chainId, vaultAddress)
+            ]);
+
+            console.log('Velodrome vault result:', res)
+            console.log('YDaemon FAPY:', ydaemonFAPY)
+
+            expect(res).toBeDefined()
+            expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY ?? 0, 0.01)
+        }, 15000)
+    })
 })
