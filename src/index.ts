@@ -44,7 +44,8 @@ export async function computeVaultFapy(
       keepVelo: fapy.keepVelo,
     };
   } catch (error) {
-    console.log("error", error)
-    return null;
+    console.log("FaPY calculation error", error)
+
+    throw error;
   }
 }

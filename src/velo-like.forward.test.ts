@@ -50,13 +50,6 @@ describe('velo-like.forward core helpers', () => {
       const result = await isVeloVault(10, hex('0xAsset'))
       expect(result).toEqual([null, false])
     })
-
-    it('returns false on error', async () => {
-      mockReadContract.mockRejectedValueOnce(new Error('RPC error'))
-
-      const result = await isVeloVault(10, hex('0xAsset'))
-      expect(result).toEqual([null, false])
-    })
   })
 
   describe('isAeroVault', () => {

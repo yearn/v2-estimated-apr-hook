@@ -60,7 +60,6 @@ describe('Calculate FAPY', () => {
                 getYDaemonFAPY(chainId, vaultAddress)
             ]);
 
-            console.log(res)
             expect(res).toBeDefined()
             expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY ?? 0, 0.01)
             expect(ydaemonFAPY.composite.boost).toBeCloseTo(res?.boost ?? 0, 0.01)
@@ -134,9 +133,6 @@ describe('Calculate FAPY', () => {
                 computeVaultFapy(chainId, vaultAddress),
                 getYDaemonFAPY(chainId, vaultAddress)
             ]);
-
-            console.log('Velodrome vault result:', res)
-            console.log('YDaemon FAPY:', ydaemonFAPY)
 
             expect(res).toBeDefined()
             expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY ?? 0, 0.01)
