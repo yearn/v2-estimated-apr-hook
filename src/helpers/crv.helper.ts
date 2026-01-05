@@ -13,7 +13,7 @@ type Address = `0x${string}`
 export const getCurveBoost = async (chainID: number, voter: Address, gauge: Address) => {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainID}`]!),
+    transport: http(getRPCUrl(chainId)!),
   });
 
   const [{ result: workingBalance }, { result: balanceOf }] = await client.multicall({
@@ -63,7 +63,7 @@ export const getCurveBoost = async (chainID: number, voter: Address, gauge: Addr
 export const determineConvexKeepCRV = async (chainID: number, strategy: Strategy) => {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainID}`]!),
+    transport: http(getRPCUrl(chainId)!),
   });
   try {
     const uselLocalCRV = await client.readContract({

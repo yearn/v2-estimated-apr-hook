@@ -10,7 +10,7 @@ import { getChainFromChainId } from '../utils/rpcs'
 export const getCVXForCRV = async (chainID: number, crvEarned: bigint) => {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainID}`]!),
+    transport: http(getRPCUrl(chainId)!),
   });
 
   // Constants from Go code
@@ -65,7 +65,7 @@ export const getConvexRewardAPY = async (
 ): Promise<{ totalRewardsAPR: Float; totalRewardsAPY: Float }> => {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainID}`]!),
+    transport: http(getRPCUrl(chainId)!),
   });
 
   // Get reward PID from strategy
