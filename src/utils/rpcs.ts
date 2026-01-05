@@ -5,10 +5,10 @@ export const getChainFromChainId = (chainId: number) => {
 };
 
 export function getRPCUrl(chainId: number) {
-  const rpcUrl = process.env[`RPC_CHAIN_URL_${chainId}`];
+  const rpcUrl = process.env[`RPC_URI_FOR_${chainId}`];
 
   if (!rpcUrl) {
-    throw new Error(`RPC URL not set in environment variables for chain ${chainId}`);
+    throw new Error(`RPC_URI_FOR_ not set in environment variables for chain ${chainId}`);
   }
 
   return rpcUrl;
