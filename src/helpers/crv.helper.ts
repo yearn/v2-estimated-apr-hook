@@ -63,7 +63,7 @@ export const getCurveBoost = async (chainID: number, voter: Address, gauge: Addr
 export const determineConvexKeepCRV = async (chainID: number, strategy: Strategy) => {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(getRPCUrl(chainId)!),
+    transport: http(getRPCUrl(chainID)),
   });
   try {
     const uselLocalCRV = await client.readContract({
