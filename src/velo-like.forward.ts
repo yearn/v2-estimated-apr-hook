@@ -7,7 +7,7 @@ import { Float } from './helpers/bignumber-float';
 import { BigNumberInt, toNormalizedAmount } from './helpers/bignumber-int';
 import { GqlStrategy, GqlVault } from './types/kongTypes';
 import { VaultAPY } from './fapy';
-import { getChainFromChainId } from './utils/rpcs';
+import { getChainFromChainId, getRPCUrl } from './utils/rpcs';
 import { VELO_STAKING_POOLS_REGISTRY, VELO_TOKEN_ADDRESS } from './helpers/maps.helper';
 
 export async function isVeloVault(
@@ -24,7 +24,7 @@ export async function isVeloVault(
   try {
     const client = createPublicClient({
       chain: getChainFromChainId(chainId),
-      transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+      transport: http(getRPCUrl(chainId)),
     });
 
     const gaugeAddress = (await client.readContract({
@@ -57,7 +57,7 @@ export async function isAeroVault(
   try {
     const client = createPublicClient({
       chain: getChainFromChainId(chainId),
-      transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+      transport: http(getRPCUrl(chainId)),
     });
 
     const gaugeAddress = (await client.readContract({
@@ -99,7 +99,7 @@ export async function determineVeloKeepVELO(
   try {
     const client = createPublicClient({
       chain: getChainFromChainId(chainId),
-      transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+      transport: http(getRPCUrl(chainId)),
     });
 
     const localKeepVELO = (await client.readContract({
@@ -123,7 +123,7 @@ export async function calculateVeloLikeStrategyAPY(
 ) {
   const client = createPublicClient({
     chain: getChainFromChainId(chainId),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+    transport: http(getRPCUrl(chainId)),
   });
 
   const [

@@ -22,7 +22,7 @@ import { Float } from './helpers/bignumber-float';
 import { BigNumberInt, toNormalizedAmount } from './helpers/bignumber-int';
 import { GqlStrategy, GqlVault } from './types/kongTypes';
 import { VaultAPY } from './fapy';
-import { getChainFromChainId } from './utils/rpcs';
+import { getChainFromChainId, getRPCUrl } from './utils/rpcs';
 import { YEARN_VAULT_V022_ABI, YEARN_VAULT_V030_ABI, YEARN_VAULT_ABI_04 } from './abis/0xAbis.abi';
 
 export function isCurveStrategy(vault: { name?: string | null }) {
@@ -100,7 +100,7 @@ export async function getCVXPoolAPY(
 ) {
   const client = createPublicClient({
     chain: getChainFromChainId(chainId),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+    transport: http(getRPCUrl(chainId)),
   });
   let crvAPR = new Float(0),
     cvxAPR = new Float(0),
@@ -211,7 +211,7 @@ export async function determineCurveKeepCRV(strategy: GqlStrategy, chainId: numb
   try {
     const client = createPublicClient({
       chain: getChainFromChainId(chainId),
-      transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+      transport: http(getRPCUrl(chainId)),
     });
     const abi = getStrategyContractAbi(strategy);
 
@@ -388,7 +388,7 @@ export async function calculatePrismaForwardAPR(data: any) {
   const { vault, chainId } = data;
   const client = createPublicClient({
     chain: getChainFromChainId(chainId),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+    transport: http(getRPCUrl(chainId)),
   });
   const [receiver] = (await client.readContract({
     address: vault.address,

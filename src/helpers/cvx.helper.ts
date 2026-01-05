@@ -5,12 +5,12 @@ import { CVX_TOKEN_ADDRESS } from './maps.helper'
 import { convexBaseStrategyAbi, cvxBoosterAbi, crvRewardsAbi } from '../abis'
 import { Float } from './bignumber-float'
 import { toNormalizedAmount, BigNumberInt } from './bignumber-int'
-import { getChainFromChainId } from '../utils/rpcs'
+import { getChainFromChainId, getRPCUrl } from '../utils/rpcs'
 
 export const getCVXForCRV = async (chainID: number, crvEarned: bigint) => {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainID}`]!),
+    transport: http(getRPCUrl(chainID)),
   });
 
   // Constants from Go code
@@ -65,7 +65,7 @@ export const getConvexRewardAPY = async (
 ): Promise<{ totalRewardsAPR: Float; totalRewardsAPY: Float }> => {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainID}`]!),
+    transport: http(getRPCUrl(chainID)),
   });
 
   // Get reward PID from strategy

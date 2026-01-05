@@ -2,12 +2,12 @@ import { BigNumber } from '@ethersproject/bignumber'
 import { createPublicClient, http, zeroAddress } from 'viem'
 import { fetchErc20PriceUsd } from '../utils/prices'
 import { yprismaReceiverAbi } from '../abis/yprisma-receiver.abi'
-import { getChainFromChainId } from '../utils/rpcs'
+import { getChainFromChainId, getRPCUrl } from '../utils/rpcs'
 
 export async function getPrismaAPY(chainID: number, prismaReceiver: string): Promise<[number, number]> {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(process.env[`RPC_CHAIN_URL_${chainID}`])
+    transport: http(getRPCUrl(chainID))
   })
 
   try {
