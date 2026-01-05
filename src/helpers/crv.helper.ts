@@ -1,7 +1,7 @@
 import { convexBaseStrategyAbi } from '../abis/convex-base-strategy.abi'
 import { curveGaugeAbi } from '../abis/crv-gauge.abi'
 import { strategyBaseAbi } from '../abis/strategy-base.abi'
-import { getChainFromChainId } from '../utils/rpcs'
+import { getChainFromChainId, getRPCUrl } from '../utils/rpcs'
 import { Strategy } from '../types/strategies'
 import { BigNumberInt, toNormalizedAmount } from './bignumber-int'
 import { BigNumber } from '@ethersproject/bignumber'
@@ -13,7 +13,7 @@ type Address = `0x${string}`
 export const getCurveBoost = async (chainID: number, voter: Address, gauge: Address) => {
   const client = createPublicClient({
     chain: getChainFromChainId(chainID),
-    transport: http(getRPCUrl(chainId)!),
+    transport: http(getRPCUrl(chainID)),
   });
 
   const [{ result: workingBalance }, { result: balanceOf }] = await client.multicall({
