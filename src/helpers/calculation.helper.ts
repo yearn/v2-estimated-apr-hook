@@ -1,13 +1,7 @@
 export function convertFloatAPRToAPY(apr: number, periodsPerYear: number): number {
-  // Convert APR to decimal form (div by 100 to convert percentage to decimal)
-  const aprDecimal = apr / 100.0
-
-  // APY = (1 + r/n)^n - 1
-  // where r is the APR in decimal form and n is the number of compounding periods
-  const apy = Math.pow(1 + (aprDecimal / periodsPerYear), periodsPerYear) - 1
-
-  // Convert back to percentage
-  return apy * 100
+  // APR is expected as a decimal (e.g. 0.56 for 56%).
+  // APY = (1 + r/n)^n - 1, where r is the APR in decimal form.
+  return Math.pow(1 + (apr / periodsPerYear), periodsPerYear) - 1
 }
 
 export function toNormalizedAmount(amount: bigint, decimals: number): number {

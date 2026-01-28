@@ -180,11 +180,8 @@ export async function getCVXPoolAPY(
     crvAPR = new Float(0).mul(crvPerUnderlyingPerYear, new Float(crvPrice));
     cvxAPR = new Float(0).mul(cvxPerYear, new Float(cvxPrice));
 
-    const [crvAPRFloat64] = crvAPR.toFloat64();
-    const [cvxAPRFloat64] = cvxAPR.toFloat64();
-
-    crvAPY = new Float().setFloat64(convertFloatAPRToAPY(crvAPRFloat64, 365 / 15));
-    cvxAPY = new Float().setFloat64(convertFloatAPRToAPY(cvxAPRFloat64, 365 / 15));
+    crvAPY = new Float().add(new Float(0), crvAPR); // crvAPY = crvAPR
+    cvxAPY = new Float().add(new Float(0), cvxAPR); // cvxAPY = cvxAPR
   } catch { }
   return { crvAPR, cvxAPR, crvAPY, cvxAPY };
 }
@@ -269,28 +266,17 @@ export async function calculateCurveForwardAPY(data: {
   let grossAPY = new Float().mul(data.baseAPY, yboost); // baseAPR * yBoost
   grossAPY = new Float().mul(grossAPY, keepCRVRatio); // (baseAPR * yBoost) * (1 - keepCRV)
   grossAPY = new Float().add(grossAPY, data.rewardAPY); // + rewardAPY
-  grossAPY = new Float().add(grossAPY, data.poolAPY); // + poolAPY
+  // poolAPY NOT added to grossAPY
 
   let netAPR = new Float().mul(grossAPY, oneMinusPerfFee);
-  if (netAPR.gt(managementFee)) netAPR = new Float().sub(netAPR, managementFee);
-  else netAPR = new Float(0);
-
-  // Calculate APY from APR based on vault version
-  // For vaults < 0.3.0, APY = APR (simple interest)
-  // For vaults >= 0.3.0, APY could use compound formula but keeping it simple for forward APR
   let netAPY: Float;
-  const apiVersion = data.vault.apiVersion || '0.0.0';
-  const versionParts = apiVersion.split('.');
-  const majorVersion = parseInt(versionParts[0] || '0');
-  const minorVersion = parseInt(versionParts[1] || '0');
-
-  if (majorVersion === 0 && minorVersion < 3) {
-    // For v0.2.x and below, APY = APR
-    netAPY = netAPR;
+  if (netAPR.gt(managementFee)) {
+    netAPR = new Float().sub(netAPR, managementFee);
+    const [netAPRFloat64] = netAPR.toFloat64();
+    netAPY = new Float().setFloat64(convertFloatAPRToAPY(netAPRFloat64, 52));
+    netAPY = new Float().add(netAPY, data.poolAPY); // poolAPY added after fees
   } else {
-    // For v0.3.0 and above, keep APY = APR for forward-looking calculations
-    // The compound interest would be: APY = (1 + APR/52)^52 - 1 for weekly compounding
-    netAPY = netAPR;
+    netAPY = new Float().add(new Float(0), data.poolAPY); // only poolAPY if no yield from strategy
   }
 
   return {
@@ -348,15 +334,19 @@ export async function calculateConvexForwardAPY(data: {
   const keepCRVRatio = new Float().sub(new Float(1), keepCRV);
   let grossAPY = new Float().mul(crvAPY, keepCRVRatio);
   grossAPY = new Float().add(grossAPY, rewardsAPY);
-  grossAPY = new Float().add(grossAPY, poolWeeklyAPY);
+  // poolWeeklyAPY NOT added to grossAPY
   grossAPY = new Float().add(grossAPY, cvxAPY);
 
   let netAPR = new Float().mul(grossAPY, oneMinusPerfFee);
-  if (netAPR.gt(managementFee)) netAPR = new Float().sub(netAPR, managementFee);
-  else netAPR = new Float(0);
-
-  // For Convex strategies, APY = APR (keeping it simple for forward-looking calculations)
-  const netAPY = netAPR;
+  let netAPY: Float;
+  if (netAPR.gt(managementFee)) {
+    netAPR = new Float().sub(netAPR, managementFee);
+    const [netAPRFloat64] = netAPR.toFloat64();
+    netAPY = new Float().setFloat64(convertFloatAPRToAPY(netAPRFloat64, 52));
+    netAPY = new Float().add(netAPY, poolWeeklyAPY);
+  } else {
+    netAPY = new Float().add(new Float(0), poolWeeklyAPY);
+  }
 
   return {
     type: 'cvx',
@@ -444,8 +434,7 @@ export async function calculateGaugeBaseAPR(
   baseAPR = new Float().mul(baseAPR, boostByPool);
   baseAPR = new Float().mul(baseAPR, crvPrice);
   baseAPR = new Float().div(baseAPR, baseAssetPriceFloat);
-  const [baseAPRFloat] = (baseAPR as any).toFloat64();
-  const baseAPY = new Float().setFloat64(convertFloatAPRToAPY(baseAPRFloat, 365 / 15));
+  const baseAPY = new Float().add(new Float(0), baseAPR); // baseAPY = baseAPR (no extra compounding)
   return { baseAPY, baseAPR };
 }
 

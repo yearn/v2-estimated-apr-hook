@@ -1,6 +1,5 @@
 import { createPublicClient, erc20Abi, http } from 'viem'
 import { fetchErc20PriceUsd } from '../utils/prices'
-import { convertFloatAPRToAPY } from './calculation.helper'
 import { CVX_TOKEN_ADDRESS } from './maps.helper'
 import { convexBaseStrategyAbi, cvxBoosterAbi, crvRewardsAbi } from '../abis'
 import { Float } from './bignumber-float'
@@ -192,8 +191,7 @@ export const getConvexRewardAPY = async (
     }
   }
 
-  const [totalRewardsAPRFloat64] = totalRewardsAPR.toFloat64()
-  const totalRewardsAPY = new Float(convertFloatAPRToAPY(totalRewardsAPRFloat64, 365 / 15))
+  const totalRewardsAPY = new Float().add(new Float(0), totalRewardsAPR) // APY = APR (no extra compounding)
 
   return {
     totalRewardsAPR: totalRewardsAPR,
