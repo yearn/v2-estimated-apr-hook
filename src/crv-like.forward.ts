@@ -1,15 +1,16 @@
-import { zeroAddress, createPublicClient, http } from 'viem';
-import { fetchErc20PriceUsd } from './utils/prices';
+import { createPublicClient, http, zeroAddress } from 'viem';
+import { YEARN_VAULT_ABI_04, YEARN_VAULT_V022_ABI, YEARN_VAULT_V030_ABI } from './abis/0xAbis.abi';
 import { convexBaseStrategyAbi } from './abis/convex-base-strategy.abi';
 import { crvRewardsAbi } from './abis/crv-rewards.abi';
 import { cvxBoosterAbi } from './abis/cvx-booster.abi';
 import { yprismaAbi } from './abis/yprisma.abi';
+import { VaultAPY } from './fapy';
 import {
   convertFloatAPRToAPY,
+  CONVEX_VOTER_ADDRESS,
   CRV_TOKEN_ADDRESS,
   CVX_BOOSTER_ADDRESS,
   CVX_TOKEN_ADDRESS,
-  CONVEX_VOTER_ADDRESS,
   determineConvexKeepCRV,
   getConvexRewardAPY,
   getCurveBoost,
@@ -17,13 +18,12 @@ import {
   getPrismaAPY,
   YEARN_VOTER_ADDRESS,
 } from './helpers';
-import { Gauge, CrvPool, CrvSubgraphPool, FraxPool, CVXPoolInfo } from './types';
 import { Float } from './helpers/bignumber-float';
 import { BigNumberInt, toNormalizedAmount } from './helpers/bignumber-int';
+import { CrvPool, CrvSubgraphPool, CVXPoolInfo, FraxPool, Gauge } from './types';
 import { GqlStrategy, GqlVault } from './types/kongTypes';
-import { VaultAPY } from './fapy';
+import { fetchErc20PriceUsd } from './utils/prices';
 import { getChainFromChainId, getRPCUrl } from './utils/rpcs';
-import { YEARN_VAULT_V022_ABI, YEARN_VAULT_V030_ABI, YEARN_VAULT_ABI_04 } from './abis/0xAbis.abi';
 
 export function isCurveStrategy(vault: { name?: string | null }) {
   const vaultName = (vault?.name || '').toLowerCase();
@@ -375,13 +375,13 @@ export async function calculateFraxForwardAPY(data: any, fraxPool: any) {
 }
 
 export async function calculatePrismaForwardAPR(data: any) {
-  const { vault, chainId } = data;
+  const { strategy, chainId } = data;
   const client = createPublicClient({
     chain: getChainFromChainId(chainId),
     transport: http(getRPCUrl(chainId)),
   });
   const [receiver] = (await client.readContract({
-    address: vault.address,
+    address: strategy.address,
     abi: yprismaAbi as any,
     functionName: 'prismaReceiver',
     args: [],
