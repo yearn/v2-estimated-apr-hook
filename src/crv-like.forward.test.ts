@@ -4,6 +4,7 @@ import { determineCurveKeepCRV, getPoolWeeklyAPY, getRewardsAPY } from './crv-li
 import * as forwardAPY from './crv-like.forward'
 import * as helpers from './helpers'
 import { convertFloatAPRToAPY } from './helpers/calculation.helper'
+import { raw } from 'express'
 
 const mockReadContract = vi.fn()
 const mockMulticall = vi.fn()
@@ -103,7 +104,7 @@ describe('crv-like.forward core helpers', () => {
     vi.spyOn(forwardAPY, 'determineCurveKeepCRV').mockResolvedValueOnce(0)
     mockMulticall.mockResolvedValueOnce([{ result: BigInt(2e6) }])
 
-    const res = await forwardAPY.calculateCurveForwardAPY(data as any)
+    const { weighted: res, raw } = await forwardAPY.calculateCurveForwardAPY(data as any)
 
     expect(res).toHaveProperty('type', 'crv')
     expect(res).toHaveProperty('netAPY')
@@ -116,6 +117,10 @@ describe('crv-like.forward core helpers', () => {
     // netAPY = convertFloatAPRToAPY(0.145, 52) + poolAPY ≈ 0.1556 + 0.01 ≈ 0.1656
     expect(res.netAPY).toBeGreaterThan(0.16)
     expect(res.netAPY).toBeLessThan(0.17)
+
+    expect(raw.address).toBe(data.strategy.address)
+    expect(raw.debtRatio).toBe(data.lastDebtRatio.toNumber() / 10000)
+    expect(raw.netAPY).toBeGreaterThan(0)
   })
 
   it('convertFloatAPRToAPY accepts decimal inputs and returns decimal output', () => {
@@ -149,7 +154,7 @@ describe('crv-like.forward core helpers', () => {
     vi.spyOn(forwardAPY, 'determineCurveKeepCRV').mockResolvedValueOnce(0)
     mockMulticall.mockResolvedValueOnce([{ result: BigInt(2e6) }])
 
-    const res = await forwardAPY.calculateCurveForwardAPY(data as any)
+    const { weighted: res, raw } = await forwardAPY.calculateCurveForwardAPY(data as any)
 
     // grossAPY = 0.05 * 2.5 * 1 + 0.02 = 0.145
     // netAPR = 0.145 * 0.8 - 0.02 = 0.116 - 0.02 = 0.096
@@ -159,6 +164,12 @@ describe('crv-like.forward core helpers', () => {
     expect(res.poolAPY).toBeCloseTo(0.03, 2)
     expect(res.netAPY).toBeGreaterThan(0.12)
     expect(res.netAPY).toBeLessThan(0.14)
+
+    expect(raw.address).toBe(data.strategy.address)
+    expect(raw.debtRatio).toBe(data.lastDebtRatio.toNumber() / 10000)
+    expect(raw.netAPY).toBeGreaterThan(0)
+    expect(raw.poolAPY).toBeCloseTo(0.03, 2)
+    expect(raw.netAPY).toBeCloseTo(res.netAPY, 10)
   })
 
 })

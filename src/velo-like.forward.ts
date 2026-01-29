@@ -121,6 +121,17 @@ export async function calculateVeloLikeStrategyAPY(
   gaugeAddress: `0x${string}`,
   chainId: number,
 ) {
+  const empty = {
+    type: 'v2:velo_unpopular',
+    debtRatio: 0,
+    netAPY: 0,
+    boost: 0,
+    poolAPY: 0,
+    boostedAPR: 0,
+    baseAPR: 0,
+    rewardsAPY: 0,
+  };
+
   const client = createPublicClient({
     chain: getChainFromChainId(chainId),
     transport: http(getRPCUrl(chainId)),
@@ -160,22 +171,9 @@ export async function calculateVeloLikeStrategyAPY(
 
   const now = Math.floor(Date.now() / 1000);
   if (!periodFinish || Number(periodFinish) < now) {
-    return {
-      type: 'v2:velo_unpopular',
-      debtRatio: 0,
-      netAPY: 0,
-      keepVelo,
-    };
+    return { weighted: { ...empty, keepVelo }, raw: { ...empty, keepVelo, address: strategy.address } };
   }
 
-  if (!totalSupply || totalSupply === 0n) {
-    return {
-      type: 'v2:velo_unpopular',
-      debtRatio: 0,
-      netAPY: 0,
-      keepVelo,
-    };
-  }
 
   const debtRatio = toNormalizedAmount(new BigNumberInt(strategy.debtRatio ?? 0), 4);
   const performanceFee = toNormalizedAmount(new BigNumberInt(vault.performanceFee ?? 0), 4);
@@ -189,12 +187,18 @@ export async function calculateVeloLikeStrategyAPY(
   const secondsPerYear = new Float(31556952);
 
   if (rewardRateNormalized.isZero() || oneMinusKeepVelo.isZero()) {
-    return {
+    const res = {
       type: 'v2:velo_unpopular',
       debtRatio: debtRatio.toFloat64()[0],
-      netAPY: 0,
       keepVelo,
+      netAPY: 0,
+      boost: 0,
+      poolAPY: 0,
+      boostedAPR: 0,
+      baseAPR: 0,
+      rewardsAPY: 0,
     };
+    return { weighted: res, raw: { ...res, address: strategy.address } };
   }
 
   const assetAddress = vault.asset?.address as `0x${string}`;
@@ -212,12 +216,18 @@ export async function calculateVeloLikeStrategyAPY(
   const grossAPRBottom = new Float().mul(poolPriceFloat, totalSupplyNormalized);
 
   if (grossAPRBottom.isZero()) {
-    return {
+    const res = {
       type: 'v2:velo_unpopular',
       debtRatio: debtRatio.toFloat64()[0],
       netAPY: 0,
       keepVelo,
+      boost: 0,
+      poolAPY: 0,
+      boostedAPR: 0,
+      baseAPR: 0,
+      rewardsAPY: 0,
     };
+    return { weighted: res, raw: { ...res, address: strategy.address } };
   }
 
   const grossAPR = new Float().div(grossAPRTop, grossAPRBottom);
@@ -238,7 +248,7 @@ export async function calculateVeloLikeStrategyAPY(
   netAPY = netAPY.pow(compoundingPeriodsPerYear);
   netAPY = new Float().sub(netAPY, new Float(1));
 
-  return {
+  const weighted = {
     type: 'v2:velo',
     debtRatio: debtRatio.toFloat64()[0],
     netAPY: new Float().mul(netAPY, debtRatio).toFloat64()[0],
@@ -249,6 +259,21 @@ export async function calculateVeloLikeStrategyAPY(
     rewardsAPY: 0,
     keepVelo,
   };
+
+  const raw = {
+    type: 'v2:velo',
+    debtRatio: debtRatio.toFloat64()[0],
+    netAPY: netAPY.toFloat64()[0],
+    boost: 0,
+    poolAPY: 0,
+    boostedAPR: 0,
+    baseAPR: 0,
+    rewardsAPY: 0,
+    keepVelo,
+    address: strategy.address,
+  };
+
+  return { weighted, raw };
 }
 
 export async function computeVeloLikeForwardAPY({
@@ -286,20 +311,26 @@ export async function computeVeloLikeForwardAPY({
     }),
   );
 
+  const strategiesDerived: VaultAPY[] = [];
+
   for (const s of strategyAPYs) {
     if (!s) continue;
-    typeOf += ` ${s.type}`;
-    netAPY = new Float().add(netAPY, new Float(s.netAPY || 0));
-    boost = new Float().add(boost, new Float(s.boost || 0));
-    poolAPY = new Float().add(poolAPY, new Float(s.poolAPY || 0));
-    boostedAPR = new Float().add(boostedAPR, new Float(s.boostedAPR || 0));
-    baseAPR = new Float().add(baseAPR, new Float(s.baseAPR || 0));
-    rewardsAPY = new Float().add(rewardsAPY, new Float(s.rewardsAPY || 0));
-    keepVelo = new Float().add(keepVelo, new Float(s.keepVelo || 0));
+    const { weighted, raw } = s;
+    strategiesDerived.push(raw);
+
+    typeOf += ` ${weighted.type}`;
+    netAPY = new Float().add(netAPY, new Float(weighted.netAPY || 0));
+    boost = new Float().add(boost, new Float(weighted.boost || 0));
+    poolAPY = new Float().add(poolAPY, new Float(weighted.poolAPY || 0));
+    boostedAPR = new Float().add(boostedAPR, new Float(weighted.boostedAPR || 0));
+    baseAPR = new Float().add(baseAPR, new Float(weighted.baseAPR || 0));
+    rewardsAPY = new Float().add(rewardsAPY, new Float(weighted.rewardsAPY || 0));
+    keepVelo = new Float().add(keepVelo, new Float(weighted.keepVelo || 0));
   }
 
   return {
     type: typeOf.trim(),
+    strategies: strategiesDerived,
     netAPR: netAPY.toFloat64()[0],
     netAPY: netAPY.toFloat64()[0],
     boost: boost.toFloat64()[0],

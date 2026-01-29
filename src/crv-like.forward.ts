@@ -279,7 +279,7 @@ export async function calculateCurveForwardAPY(data: {
     netAPY = new Float().add(new Float(0), data.poolAPY); // only poolAPY if no yield from strategy
   }
 
-  return {
+  const weighted = {
     type: 'crv',
     debtRatio: debtRatio.toFloat64()[0],
     netAPR: new Float().mul(netAPR, debtRatio).toFloat64()[0],
@@ -291,6 +291,22 @@ export async function calculateCurveForwardAPY(data: {
     rewardsAPY: new Float().mul(data.rewardAPY, debtRatio).toFloat64()[0],
     keepCRV: new Float(keepCrv).toFloat64()[0],
   };
+
+  const raw = {
+    type: 'crv',
+    debtRatio: debtRatio.toFloat64()[0],
+    netAPR: netAPR.toFloat64()[0],
+    netAPY: netAPY.toFloat64()[0],
+    boost: yboost.toFloat64()[0],
+    poolAPY: data.poolAPY.toFloat64()[0],
+    boostedAPR: crvAPY.toFloat64()[0],
+    baseAPR: data.baseAPY.toFloat64()[0],
+    rewardsAPY: data.rewardAPY.toFloat64()[0],
+    keepCRV: new Float(keepCrv).toFloat64()[0],
+    address: data.strategy.address,
+  };
+
+  return { weighted, raw };
 }
 
 export async function calculateConvexForwardAPY(data: {
@@ -348,7 +364,7 @@ export async function calculateConvexForwardAPY(data: {
     netAPY = new Float().add(new Float(0), poolWeeklyAPY);
   }
 
-  return {
+  const weighted = {
     type: 'cvx',
     debtRatio: debtRatio.toFloat64()[0],
     netAPY: new Float().mul(netAPY, debtRatio).toFloat64()[0],
@@ -360,18 +376,45 @@ export async function calculateConvexForwardAPY(data: {
     rewardsAPY: new Float().mul(rewardsAPY, debtRatio).toFloat64()[0],
     keepCRV: keepCRV.toFloat64()[0],
   };
+
+  const raw = {
+    type: 'cvx',
+    debtRatio: debtRatio.toFloat64()[0],
+    netAPY: netAPY.toFloat64()[0],
+    boost: cvxBoost.toFloat64()[0],
+    poolAPY: poolWeeklyAPY.toFloat64()[0],
+    boostedAPR: crvAPR.toFloat64()[0],
+    baseAPR: baseAPY.toFloat64()[0],
+    cvxAPR: cvxAPR.toFloat64()[0],
+    rewardsAPY: rewardsAPY.toFloat64()[0],
+    keepCRV: keepCRV.toFloat64()[0],
+    address: strategy.address,
+  };
+
+  return { weighted, raw };
 }
 
 export async function calculateFraxForwardAPY(data: any, fraxPool: any) {
   if (!fraxPool) return null;
   const base = await calculateConvexForwardAPY(data);
   const minRewardsAPR = parseFloat(fraxPool.totalRewardAprs.min);
-  return {
-    ...base,
+  const minRewardsAPRWeighted = minRewardsAPR * base.weighted.debtRatio;
+
+  const weighted = {
+    ...base.weighted,
     type: 'frax',
-    netAPY: base.netAPY + minRewardsAPR,
-    rewardsAPY: base.rewardsAPY + minRewardsAPR,
+    netAPY: base.weighted.netAPY + minRewardsAPRWeighted,
+    rewardsAPY: base.weighted.rewardsAPY + minRewardsAPRWeighted,
   };
+
+  const raw = {
+    ...base.raw,
+    type: 'frax',
+    netAPY: base.raw.netAPY + minRewardsAPR,
+    rewardsAPY: base.raw.rewardsAPY + minRewardsAPR,
+  };
+
+  return { weighted, raw };
 }
 
 export async function calculatePrismaForwardAPR(data: any) {
@@ -391,18 +434,34 @@ export async function calculatePrismaForwardAPR(data: any) {
     calculateConvexForwardAPY({ ...data, lastDebtRatio: new Float(data.strategy?.debtRatio || 0) }),
     getPrismaAPY(chainId, receiver),
   ]);
-  return {
+  const weighted = {
     type: 'prisma',
-    debtRatio: base.debtRatio,
-    netAPY: base.netAPY + prismaAPY,
-    boost: base.boost,
-    poolAPY: base.poolAPY,
-    boostedAPR: base.boostedAPR,
-    baseAPR: base.baseAPR,
-    cvxAPR: base.cvxAPR,
-    rewardsAPY: base.rewardsAPY + prismaAPY,
-    keepCRV: base.keepCRV,
+    debtRatio: base.weighted.debtRatio,
+    netAPY: base.weighted.netAPY + prismaAPY * base.weighted.debtRatio,
+    boost: base.weighted.boost,
+    poolAPY: base.weighted.poolAPY,
+    boostedAPR: base.weighted.boostedAPR,
+    baseAPR: base.weighted.baseAPR,
+    cvxAPR: base.weighted.cvxAPR,
+    rewardsAPY: base.weighted.rewardsAPY + prismaAPY * base.weighted.debtRatio,
+    keepCRV: base.weighted.keepCRV,
   };
+
+  const raw = {
+    type: 'prisma',
+    debtRatio: base.raw.debtRatio,
+    netAPY: base.raw.netAPY + prismaAPY,
+    boost: base.raw.boost,
+    poolAPY: base.raw.poolAPY,
+    boostedAPR: base.raw.boostedAPR,
+    baseAPR: base.raw.baseAPR,
+    cvxAPR: base.raw.cvxAPR,
+    rewardsAPY: base.raw.rewardsAPY + prismaAPY,
+    keepCRV: base.raw.keepCRV,
+    address: base.raw.address,
+  };
+
+  return { weighted, raw };
 }
 
 export async function calculateGaugeBaseAPR(
@@ -549,6 +608,8 @@ export async function computeCurveLikeForwardAPY({
 
   const strategyAPRs = await Promise.all(
     allStrategiesForVault.map(async (strategy) => {
+      // NOTE: debtRatio=0 strategies are skipped for calculation but we might want them?
+      // User request says "active strategy (debtRatio > 0)". Logic consistent.
       if (!strategy.debtRatio || strategy.debtRatio === 0) return null;
       return calculateCurveLikeStrategyAPR(
         vault,
@@ -562,24 +623,30 @@ export async function computeCurveLikeForwardAPY({
     }),
   );
 
+  const strategiesDerived: VaultAPY[] = [];
+
   for (const s of strategyAPRs) {
     if (!s) continue;
-    typeOf += s.type;
-    netAPY = new Float(0).add(netAPY, new Float(s.netAPY || 0));
-    boost = new Float(0).add(boost, new Float(s.boost || 0));
-    poolAPY = new Float(0).add(poolAPY, new Float(s.poolAPY || 0));
-    boostedAPR = new Float(0).add(boostedAPR, new Float(s.boostedAPR || 0));
-    baseAPR = new Float(0).add(baseAPR, new Float(s.baseAPR || 0));
-    cvxAPR = new Float(0).add(cvxAPR, new Float((s as any).cvxAPR || 0));
-    rewardsAPY = new Float(0).add(rewardsAPY, new Float(s.rewardsAPY || 0));
+    const { weighted, raw } = s;
+    strategiesDerived.push(raw);
+
+    typeOf += weighted.type;
+    netAPY = new Float(0).add(netAPY, new Float(weighted.netAPY || 0));
+    boost = new Float(0).add(boost, new Float(weighted.boost || 0));
+    poolAPY = new Float(0).add(poolAPY, new Float(weighted.poolAPY || 0));
+    boostedAPR = new Float(0).add(boostedAPR, new Float(weighted.boostedAPR || 0));
+    baseAPR = new Float(0).add(baseAPR, new Float(weighted.baseAPR || 0));
+    cvxAPR = new Float(0).add(cvxAPR, new Float((weighted as any).cvxAPR || 0));
+    rewardsAPY = new Float(0).add(rewardsAPY, new Float(weighted.rewardsAPY || 0));
     keepCRV = new Float(0).add(
       keepCRV,
-      new Float(0).mul(new Float(s.keepCRV || 0), new Float((s as any).debtRatio || 0)),
+      new Float(0).mul(new Float(weighted.keepCRV || 0), new Float((weighted as any).debtRatio || 0)),
     );
   }
 
   return {
     type: typeOf,
+    strategies: strategiesDerived,
     netAPR: netAPY.toFloat64()[0],
     netAPY: netAPY.toFloat64()[0],
     boost: boost.toFloat64()[0],

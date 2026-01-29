@@ -69,6 +69,24 @@ export async function computeFapy(hook: KongWebhook): Promise<Output[] | null> {
       }),
     );
 
+    if (fapy.strategies) {
+      for (const strategy of fapy.strategies) {
+        const strategyComponents = [...components, 'debtRatio'];
+        const strategyOutputs = strategyComponents.map((component) =>
+          OutputSchema.parse({
+            chainId: hook.chainId,
+            address: strategy.address as `0x${string}`,
+            label,
+            component,
+            value: strategy[component as keyof typeof strategy] ?? 0,
+            blockNumber: hook.blockNumber,
+            blockTime: hook.blockTime,
+          }),
+        );
+        outputs.push(...strategyOutputs);
+      }
+    }
+
     return OutputSchema.array().parse(outputs);
   } catch (error) {
     console.error('Error in computeFapy:', error);
