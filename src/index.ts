@@ -12,6 +12,7 @@ export type VaultFapy = {
   cvxAPR?: number;
   keepCRV?: number;
   keepVelo?: number;
+  strategies?: any[];
 };
 
 export async function computeVaultFapy(
@@ -42,6 +43,7 @@ export async function computeVaultFapy(
       cvxAPR: fapy.cvxAPR,
       keepCRV: fapy.keepCRV,
       keepVelo: fapy.keepVelo,
+      strategies: fapy.strategies
     };
   } catch (error) {
     console.log("FaPY calculation error", error)
