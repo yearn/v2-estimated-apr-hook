@@ -32,6 +32,16 @@ describe('Calculate FAPY', () => {
             expect(ydaemonFAPY.composite.baseAPR).toBeCloseTo(res?.baseAPR ?? 0, 0.01)
             expect(ydaemonFAPY.composite.cvxAPR).toBeCloseTo(res?.cvxAPR ?? 0, 0.01)
             expect(ydaemonFAPY.composite.rewardsAPR).toBeCloseTo(res?.rewardsAPY ?? 0, 0.01)
+
+            // Verify strategies output
+            expect(res?.strategies).toBeDefined()
+            expect(res?.strategies?.length).toBeGreaterThan(0)
+            res?.strategies?.forEach(strategy => {
+                expect(strategy.address).toMatch(/^0x[a-fA-F0-9]{40}$/)
+                expect(['crv', 'cvx', 'frax']).toContain(strategy.type)
+                expect(strategy.netAPY).toBeGreaterThan(0)
+                expect(strategy.debtRatio).toBeDefined()
+            })
         }, 10000)
 
         it('should calculate fapy for yvCurve-YFIETH', async () => {

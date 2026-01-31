@@ -18,6 +18,9 @@ export interface VaultAPY {
   keepVelo?: number;
   v3OracleCurrentAPR?: number;
   v3OracleStratRatioAPR?: number;
+  strategies?: VaultAPY[];
+  address?: string;
+  debtRatio?: number;
 }
 
 export async function computeChainAPY(
