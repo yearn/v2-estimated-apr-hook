@@ -112,18 +112,18 @@ export async function getCVXPoolAPY(
       rewardPID = await client.readContract({
         address: strategyAddress,
         abi: convexBaseStrategyAbi,
-        functionName: 'PID',
+        functionName: 'pid',
         args: [],
       });
-    } catch {
+    } catch (e1) {
       try {
         rewardPID = await client.readContract({
           address: strategyAddress,
           abi: convexBaseStrategyAbi,
-          functionName: 'ID',
+          functionName: 'id',
           args: [],
         });
-      } catch {
+      } catch (e2) {
         try {
           rewardPID = await client.readContract({
             address: strategyAddress,
@@ -131,32 +131,35 @@ export async function getCVXPoolAPY(
             functionName: 'fraxPid',
             args: [],
           });
-        } catch {
+        } catch (e3) {
           return { crvAPR, cvxAPR, crvAPY, cvxAPY };
         }
       }
     }
-    let poolInfo: CVXPoolInfo;
+    let crvRewardsAddress: `0x${string}`;
     try {
-      poolInfo = (await client.readContract({
+      // viem returns poolInfo as an array: [lptoken, token, gauge, crvRewards, stash, shutdown]
+      const poolInfoResult = await client.readContract({
         address: CVX_BOOSTER_ADDRESS[chainId],
         abi: cvxBoosterAbi,
         functionName: 'poolInfo',
         args: [rewardPID],
-      })) as CVXPoolInfo;
-    } catch {
+      });
+      // crvRewards is at index 3
+      crvRewardsAddress = (poolInfoResult as readonly unknown[])[3] as `0x${string}`;
+    } catch (e) {
       return { crvAPR, cvxAPR, crvAPY, cvxAPY };
     }
 
     const [rateResult, totalSupply] = (await Promise.all([
       client.readContract({
-        address: poolInfo.crvRewards as `0x${string}`,
+        address: crvRewardsAddress,
         abi: crvRewardsAbi,
         functionName: 'rewardRate',
         args: [],
       }),
       client.readContract({
-        address: poolInfo.crvRewards as `0x${string}`,
+        address: crvRewardsAddress,
         abi: crvRewardsAbi,
         functionName: 'totalSupply',
         args: [],
@@ -170,7 +173,7 @@ export async function getCVXPoolAPY(
     if (virtualSupply.gt(new Float(0))) crvPerUnderlying = new Float(0).div(rate, virtualSupply);
 
     const crvPerUnderlyingPerYear = new Float(0).mul(crvPerUnderlying, new Float(31536000));
-    const cvxPerYear = await getCVXForCRV(chainId, BigInt(crvPerUnderlyingPerYear.toNumber()));
+    const cvxPerYear = await getCVXForCRV(chainId, crvPerUnderlyingPerYear);
 
     const [{ priceUsd: crvPrice }, { priceUsd: cvxPrice }] = await Promise.all([
       fetchErc20PriceUsd(chainId, CRV_TOKEN_ADDRESS[chainId]),
