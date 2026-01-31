@@ -4,7 +4,6 @@ import { determineCurveKeepCRV, getPoolWeeklyAPY, getRewardsAPY } from './crv-li
 import * as forwardAPY from './crv-like.forward'
 import * as helpers from './helpers'
 import { convertFloatAPRToAPY } from './helpers/calculation.helper'
-import { raw } from 'express'
 
 const mockReadContract = vi.fn()
 const mockMulticall = vi.fn()
