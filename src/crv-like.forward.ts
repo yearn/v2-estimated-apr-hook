@@ -20,7 +20,7 @@ import {
 } from './helpers';
 import { Float } from './helpers/bignumber-float';
 import { BigNumberInt, toNormalizedAmount } from './helpers/bignumber-int';
-import { CrvPool, CrvSubgraphPool, CVXPoolInfo, FraxPool, Gauge } from './types';
+import { CrvPool, CrvSubgraphPool, FraxPool, Gauge } from './types';
 import { GqlStrategy, GqlVault } from './types/kongTypes';
 import { fetchErc20PriceUsd } from './utils/prices';
 import { getChainFromChainId, getRPCUrl } from './utils/rpcs';
@@ -47,7 +47,6 @@ export function isPrismaStrategy(strategy: { name?: string | null }) {
 export function findGaugeForVault(assetAddress: string | undefined, gauges: Gauge[]) {
   if (!assetAddress) return null;
   return gauges.find((gauge) => {
-    // Match Go logic: check SwapToken field first
     if (gauge.swap_token?.toLowerCase() === assetAddress.toLowerCase()) {
       return true;
     }
@@ -87,7 +86,7 @@ export function getRewardsAPY(pool: CrvPool) {
   let total = new Float(0);
   if (!pool?.gaugeRewards?.length) return total;
   for (const reward of pool.gaugeRewards) {
-    const apr = new Float().div(new Float(reward.APY), new Float(100));
+    const apr = new Float().div(new Float(reward.apy ?? reward.APY), new Float(100));
     total = new Float().add(total, apr);
   }
   return total;
@@ -138,14 +137,12 @@ export async function getCVXPoolAPY(
     }
     let crvRewardsAddress: `0x${string}`;
     try {
-      // viem returns poolInfo as an array: [lptoken, token, gauge, crvRewards, stash, shutdown]
       const poolInfoResult = await client.readContract({
         address: CVX_BOOSTER_ADDRESS[chainId],
         abi: cvxBoosterAbi,
         functionName: 'poolInfo',
         args: [rewardPID],
       });
-      // crvRewards is at index 3
       crvRewardsAddress = (poolInfoResult as readonly unknown[])[3] as `0x${string}`;
     } catch (e) {
       return { crvAPR, cvxAPR, crvAPY, cvxAPY };
@@ -236,7 +233,6 @@ export async function determineCurveKeepCRV(strategy: GqlStrategy, chainId: numb
     return 0;
   }
 
-  // Add keepCRV and keepPercentage together (kong logic)
   const keepValue = new BigNumberInt(keepCRV).add(new BigNumberInt(keepPercentage));
   return toNormalizedAmount(keepValue, 4).toNumber();
 }
@@ -314,6 +310,7 @@ export async function calculateCurveForwardAPY(data: {
 
 export async function calculateConvexForwardAPY(data: {
   gaugeAddress: `0x${string}`;
+  vault: GqlVault;
   strategy: GqlStrategy;
   baseAssetPrice: Float;
   poolPrice: Float;
@@ -325,6 +322,7 @@ export async function calculateConvexForwardAPY(data: {
 }) {
   const {
     gaugeAddress,
+    vault,
     strategy,
     baseAssetPrice,
     poolPrice,
@@ -338,9 +336,9 @@ export async function calculateConvexForwardAPY(data: {
     determineConvexKeepCRV(chainId, strategy as any),
   ]);
   const debtRatio = toNormalizedAmount(new BigNumberInt(lastDebtRatio.toNumber()), 4);
-  const performanceFee = toNormalizedAmount(new BigNumberInt(strategy.performanceFee ?? 0), 4);
+  const performanceFee = toNormalizedAmount(new BigNumberInt(strategy.performanceFee ?? vault.performanceFee ?? 0), 4);
   const managementFee = toNormalizedAmount(
-    new BigNumberInt((strategy as any).managementFee ?? 0),
+    new BigNumberInt(strategy.managementFee ?? vault.managementFee ?? 0),
     4,
   );
   const oneMinusPerfFee = new Float().sub(new Float(1), performanceFee);
@@ -514,8 +512,7 @@ export async function calculateCurveLikeStrategyAPR(
     fetchErc20PriceUsd(chainId, CRV_TOKEN_ADDRESS[chainId]),
     Promise.resolve(getPoolPrice(gauge)),
   ]);
-  // TODO: Remove this fallback once price fetching is fixed
-  const fallbackCrvPrice = priceUsd || 0.8618; // closer to current CRV price
+  const fallbackCrvPrice = priceUsd || 0.8618; 
   const crvPrice = new Float(fallbackCrvPrice);
   
   
@@ -539,6 +536,7 @@ export async function calculateCurveLikeStrategyAPR(
     return calculateFraxForwardAPY(
       {
         gaugeAddress: gauge.gauge as any,
+        vault,
         strategy: strategy as any,
         baseAssetPrice,
         poolPrice,
@@ -553,6 +551,7 @@ export async function calculateCurveLikeStrategyAPR(
   if (isConvexStrategy(strategy as any))
     return calculateConvexForwardAPY({
       gaugeAddress: gauge.gauge as any,
+      vault,
       strategy: strategy as any,
       baseAssetPrice,
       poolPrice,
@@ -611,8 +610,6 @@ export async function computeCurveLikeForwardAPY({
 
   const strategyAPRs = await Promise.all(
     allStrategiesForVault.map(async (strategy) => {
-      // NOTE: debtRatio=0 strategies are skipped for calculation but we might want them?
-      // User request says "active strategy (debtRatio > 0)". Logic consistent.
       if (!strategy.debtRatio || strategy.debtRatio === 0) return null;
       return calculateCurveLikeStrategyAPR(
         vault,

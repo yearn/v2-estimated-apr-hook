@@ -1,0 +1,35 @@
+name: Test
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run tests
+        run: yarn test
+        env:
+          ALLOW_INSECURE_TLS: '1'
+          RPC_URI_FOR_1: ${{ secrets.RPC_URI_FOR_1 }}
+          RPC_URI_FOR_10: ${{ secrets.RPC_URI_FOR_10 }}
+          RPC_URI_FOR_137: ${{ secrets.RPC_URI_FOR_137 }}
+          RPC_URI_FOR_250: ${{ secrets.RPC_URI_FOR_250 }}
+          RPC_URI_FOR_8453: ${{ secrets.RPC_URI_FOR_8453 }}
+          RPC_URI_FOR_42161: ${{ secrets.RPC_URI_FOR_42161 }}
+          RPC_URI_FOR_146: ${{ secrets.RPC_URI_FOR_146 }}
+          RPC_URI_FOR_100: ${{ secrets.RPC_URI_FOR_100 }}

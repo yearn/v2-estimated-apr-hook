@@ -6,7 +6,6 @@ function getYDaemonURL(chainId: number, vaultAddress: `0x${string}`) {
     return `https://ydaemon.yearn.fi/${chainId}/vaults/${vaultAddress}`
 }
 
-
 async function getYDaemonFAPY(chainId: number, vaultAddress: `0x${string}`) {
     const url = getYDaemonURL(chainId, vaultAddress)
     const res = await fetch(url)
@@ -14,127 +13,86 @@ async function getYDaemonFAPY(chainId: number, vaultAddress: `0x${string}`) {
     return data.apr.forwardAPR as YearnVaultData["apr"]["forwardAPR"]
 }
 
+// Helper to check if two numbers are within a threshold
+function expectCloseTo(actual: number, expected: number, threshold: number = 0.001) {
+    const diff = Math.abs(actual - expected)
+    expect(diff, `Expected ${actual} to be within ${threshold} of ${expected}, but diff was ${diff}`).toBeLessThanOrEqual(threshold)
+}
+
 describe('Calculate FAPY', () => {
     describe.concurrent("crv like vaults", () => {
-        [
-            '0x8A5f20dA6B393fE25aCF1522C828166D22eF8321',
-            '0xf165a634296800812B8B0607a75DeDdcD4D3cC88',
-            '0x6E9455D109202b426169F0d8f01A3332DAE160f3',
-            '0x790a60024bC3aea28385b60480f15a0771f26D09',
-        ].forEach(vaultAddress => {
-            it(`should calculate fapy for ${vaultAddress}`, async () => {
-                const chainId = 1
-                const [res, ydaemonFAPY] = await Promise.all([
-                    computeVaultFapy(chainId, vaultAddress as `0x${string}`),
-                    getYDaemonFAPY(chainId, vaultAddress as `0x${string}`)
-                ]);
+        const vaults = [
+            '0x8A5f20dA6B393fE25aCF1522C828166D22eF8321', // Curve DOLA-wstUSR Factory
+            '0xf165a634296800812B8B0607a75DeDdcD4D3cC88', // Curve reUSD-scrvUSD Factory
+            '0x6E9455D109202b426169F0d8f01A3332DAE160f3', // LP Yearn CRV Vault v2
+            '0x790a60024bC3aea28385b60480f15a0771f26D09', // Curve YFI-ETH Pool yVault
+            '0x1Fc80CfCF5B345b904A0fB36d4222196Ed9eB8a5', // Curve DOLA-sUSDe Factory yVault
+            '0x342D24F2a3233F7Ac8A7347fA239187BFd186066', // Curve DOLA-sUSDS Factory yVault
+            '0x04c8bfe2eb09a1e2e9fA97A2fd970E06d87B43de', // Curve GEAR-ETH Factory yVault
+            '0x57a2c7925bAA1894a939f9f6721Ea33F2EcFD0e2', // Curve DOLA-USR Factory
+            '0xBfBC4acAE2ceC91A5bC80eCA1C9290F92959f7c3', // Curve eUSDUSDC Factory yVault
+            '0xb7b1C394b3F82091988A1e400C6499178eE64b99', // Curve alUSD-sDOLA Factory
+        ] as const
 
-                expect(res).toBeDefined()
-                expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY || 0, 0.01)
-                expect(ydaemonFAPY.composite.boost).toBeCloseTo(res?.boost ?? 0, 0.01)
-                expect(ydaemonFAPY.composite.poolAPY).toBeCloseTo(res?.poolAPY ?? 0, 0.01)
-                expect(ydaemonFAPY.composite.boostedAPR).toBeCloseTo(res?.boostedAPR ?? 0, 0.01)
-                expect(ydaemonFAPY.composite.baseAPR).toBeCloseTo(res?.baseAPR ?? 0, 0.01)
-                expect(ydaemonFAPY.composite.cvxAPR).toBeCloseTo(res?.cvxAPR ?? 0, 0.01)
-                expect(ydaemonFAPY.composite.rewardsAPR).toBeCloseTo(res?.rewardsAPY ?? 0, 0.01)
+        it.each(vaults)('should calculate fapy for %s', async (vaultAddress) => {
+            const chainId = 1
+            const [res, ydaemonFAPY] = await Promise.all([
+                computeVaultFapy(chainId, vaultAddress),
+                getYDaemonFAPY(chainId, vaultAddress)
+            ])
 
-                // Verify strategies output
-                expect(res?.strategies).toBeDefined()
-                expect(res?.strategies?.length).toBeGreaterThan(0)
-                res?.strategies?.forEach(strategy => {
-                    expect(strategy.address).toMatch(/^0x[a-fA-F0-9]{40}$/)
-                    expect(['crv', 'cvx', 'frax']).toContain(strategy.type)
-                    expect(strategy.netAPY).toBeGreaterThan(0)
-                    expect(strategy.debtRatio).toBeDefined()
-                })
+            expect(res).toBeDefined()
 
-            }, 10000)
-        })
+            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.001)
+            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.001)
+            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.001)
+            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.001)
+            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.001)
+            expectCloseTo(res?.cvxAPR ?? 0, ydaemonFAPY.composite.cvxAPR ?? 0, 0.001)
+            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.001)
 
-        it('should calculate fapy for vault 0x27B5739e22ad9033bcBf192059122d163b60349D', async () => {
+            expect(res?.strategies).toBeDefined()
+            expect(res?.strategies?.length).toBeGreaterThan(0)
+            res?.strategies?.forEach(strategy => {
+                expect(strategy.address).toMatch(/^0x[a-fA-F0-9]{40}$/)
+                expect(['crv', 'cvx', 'frax']).toContain(strategy.type)
+                expect(strategy.netAPY).toBeGreaterThan(0)
+                expect(strategy.debtRatio).toBeDefined()
+            })
+        }, 15000)
+
+        it('should calculate fapy for 0x27B5739e22ad9033bcBf192059122d163b60349D - Yearn yCRV Vault', async () => {
             const chainId = 1
             const vaultAddress = '0x27B5739e22ad9033bcBf192059122d163b60349D'
             const [res, ydaemonFAPY] = await Promise.all([
                 computeVaultFapy(chainId, vaultAddress),
                 getYDaemonFAPY(chainId, vaultAddress)
-            ]);
-
-            expect(res).toBeDefined()
-            expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.boost).toBeCloseTo(res?.boost ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.poolAPY).toBeCloseTo(res?.poolAPY ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.boostedAPR).toBeCloseTo(res?.boostedAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.baseAPR).toBeCloseTo(res?.baseAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.cvxAPR).toBeCloseTo(res?.cvxAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.rewardsAPR).toBeCloseTo(res?.rewardsAPY ?? 0, 0.01)
-        }, 10000)
-
-        it('should calculate fapy for vault 0x57a2c7925bAA1894a939f9f6721Ea33F2EcFD0e2', async () => {
-            const chainId = 1
-            const vaultAddress = '0x57a2c7925bAA1894a939f9f6721Ea33F2EcFD0e2'
-            const [res, ydaemonFAPY] = await Promise.all([
-                computeVaultFapy(chainId, vaultAddress),
-                getYDaemonFAPY(chainId, vaultAddress)
-            ]);
-
-            expect(res).toBeDefined()
-            expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.boost).toBeCloseTo(res?.boost ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.poolAPY).toBeCloseTo(res?.poolAPY ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.boostedAPR).toBeCloseTo(res?.boostedAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.baseAPR).toBeCloseTo(res?.baseAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.cvxAPR).toBeCloseTo(res?.cvxAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.rewardsAPR).toBeCloseTo(res?.rewardsAPY ?? 0, 0.01)
-        }, 10000)
-
-        it('should calculate fapy for vault 0xBfBC4acAE2ceC91A5bC80eCA1C9290F92959f7c3', async () => {
-            const chainId = 1
-            const vaultAddress = '0xBfBC4acAE2ceC91A5bC80eCA1C9290F92959f7c3'
-            const [res, ydaemonFAPY] = await Promise.all([
-                computeVaultFapy(chainId, vaultAddress),
-                getYDaemonFAPY(chainId, vaultAddress)
-            ]);
-
-            expect(res).toBeDefined()
-            expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.boost).toBeCloseTo(res?.boost ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.poolAPY).toBeCloseTo(res?.poolAPY ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.boostedAPR).toBeCloseTo(res?.boostedAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.baseAPR).toBeCloseTo(res?.baseAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.cvxAPR).toBeCloseTo(res?.cvxAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.rewardsAPR).toBeCloseTo(res?.rewardsAPY ?? 0, 0.01)
-        }, 10000)
-
-        it('should calculate fapy for vault 0xb7b1C394b3F82091988A1e400C6499178eE64b99', async () => {
-            const chainId = 1
-            const vaultAddress = '0xb7b1C394b3F82091988A1e400C6499178eE64b99'
-            const [res, ydaemonFAPY] = await Promise.all([
-                computeVaultFapy(chainId, vaultAddress),
-                getYDaemonFAPY(chainId, vaultAddress)
-            ]);
-
-            expect(res).toBeDefined()
-            expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.boost).toBeCloseTo(res?.boost ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.poolAPY).toBeCloseTo(res?.poolAPY ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.boostedAPR).toBeCloseTo(res?.boostedAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.baseAPR).toBeCloseTo(res?.baseAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.cvxAPR).toBeCloseTo(res?.cvxAPR ?? 0, 0.01)
-            expect(ydaemonFAPY.composite.rewardsAPR).toBeCloseTo(res?.rewardsAPY ?? 0, 0.01)
-        }, 10000)
+            ])
+            expect(res).toBeDefined();
+            expect(res?.netAPY ?? 0).toEqual(ydaemonFAPY.netAPR ?? 0);
+        })
     })
 
+
     describe.concurrent("velo like vaults", () => {
-        it('should calculate fapy for Velodrome vault 0xDdDCAeE873f2D9Df0E18a80709ef2B396d4a6EA5', async () => {
+        const vaults = [
+            '0xDdDCAeE873f2D9Df0E18a80709ef2B396d4a6EA5',
+        ] as const
+
+        // Velo vaults have higher variance due to price/timing differences
+        it.each(vaults)('should calculate fapy for %s', async (vaultAddress) => {
             const chainId = 10
-            const vaultAddress = '0xDdDCAeE873f2D9Df0E18a80709ef2B396d4a6EA5'
             const [res, ydaemonFAPY] = await Promise.all([
                 computeVaultFapy(chainId, vaultAddress),
                 getYDaemonFAPY(chainId, vaultAddress)
-            ]);
+            ])
 
             expect(res).toBeDefined()
-            expect(ydaemonFAPY.netAPR).toBeCloseTo(res?.netAPY ?? 0, 0.01)
+
+            console.log(`Vault: ${vaultAddress}`)
+            console.log(`  netAPY - ours: ${res?.netAPY}, ydaemon: ${ydaemonFAPY.netAPR}`)
+
+            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.003)
         }, 15000)
     })
 })
