@@ -38,7 +38,12 @@ export function isConvexStrategy(strategy: { name?: string | null }) {
   return strategyName?.includes('convex') && !strategyName?.includes('curve');
 }
 export function isFraxStrategy(strategy: { name?: string | null }) {
-  return strategy?.name?.toLowerCase().includes('frax');
+  const strategyName = strategy?.name?.toLowerCase() || '';
+  // Match actual Frax staking strategies (StrategyConvexFrax*, StrategyFrax*),
+  // not strategies that just use a FRAX pool (e.g., StrategyCurveBoostedFactory-FRAX3CRV-f)
+  return strategyName.includes('convexfrax') ||
+         strategyName.includes('strategyfrax') ||
+         (strategyName.includes('frax') && !strategyName.includes('curve'));
 }
 export function isPrismaStrategy(strategy: { name?: string | null }) {
   return strategy?.name?.toLowerCase().includes('prisma');
