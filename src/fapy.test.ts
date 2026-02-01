@@ -43,9 +43,6 @@ describe('Calculate FAPY', () => {
 
             expect(res).toBeDefined()
 
-            console.log(`Vault: ${vaultAddress}`)
-            console.log(`  netAPY - ours: ${res?.netAPY}, ydaemon: ${ydaemonFAPY.netAPR}`)
-
             expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.001)
             expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.001)
             expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.001)
