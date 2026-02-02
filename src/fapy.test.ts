@@ -94,6 +94,7 @@ describe('Calculate FAPY', () => {
 
             expect(res).toBeDefined()
 
+            console.log(res)
             // Use 0.005 (50 basis points) tolerance for live API comparisons
             // Data sources may have timing/caching differences
             expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.005)
@@ -123,7 +124,8 @@ describe('Calculate FAPY', () => {
             '0x4d3ceBA4349ADB06d2De8EBD2F9320A61303aD81',
             '0x31Ce9aB5A358E5c802Cc01080F29a65a14EB45b8',
             '0x68393A804c9fe4f1c7148d37796436e450Ad98E8',
-            '0x68A0ba9EcaD98BFd16D2457E2546226e8FB7C101'
+            '0x68A0ba9EcaD98BFd16D2457E2546226e8FB7C101',
+            '0x30BcA23B220dEb343f62c83edA1465546Ac9C7F7'
         ] as const
 
         it.each(vaults)('should calculate fapy for %s', async (vaultAddress) => {
@@ -134,7 +136,7 @@ describe('Calculate FAPY', () => {
             ])
 
             expect(res).toBeDefined()
-
+            console.log(res);
             // Use 0.005 (50 basis points) tolerance for live API comparisons
             // Data sources may have timing/caching differences
             expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.005)
