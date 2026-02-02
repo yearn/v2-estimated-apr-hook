@@ -1,9 +1,8 @@
-import { createPublicClient, http, zeroAddress } from 'viem';
+import { createPublicClient, http } from 'viem';
 import { YEARN_VAULT_ABI_04, YEARN_VAULT_V022_ABI, YEARN_VAULT_V030_ABI } from './abis/0xAbis.abi';
 import { convexBaseStrategyAbi } from './abis/convex-base-strategy.abi';
 import { crvRewardsAbi } from './abis/crv-rewards.abi';
 import { cvxBoosterAbi } from './abis/cvx-booster.abi';
-import { yprismaAbi } from './abis/yprisma.abi';
 import { VaultAPY } from './fapy';
 import {
   convertFloatAPRToAPY,
@@ -15,7 +14,6 @@ import {
   getConvexRewardAPY,
   getCurveBoost,
   getCVXForCRV,
-  getPrismaAPY,
   YEARN_VOTER_ADDRESS,
 } from './helpers';
 import { Float } from './helpers/bignumber-float';
@@ -45,10 +43,6 @@ export function isFraxStrategy(strategy: { name?: string | null }) {
          strategyName.includes('strategyfrax') ||
          (strategyName.includes('frax') && !strategyName.includes('curve'));
 }
-export function isPrismaStrategy(strategy: { name?: string | null }) {
-  return strategy?.name?.toLowerCase().includes('prisma');
-}
-
 export function findGaugeForVault(assetAddress: string | undefined, gauges: Gauge[]) {
   if (!assetAddress) return null;
   return gauges.find((gauge) => {
@@ -423,53 +417,6 @@ export async function calculateFraxForwardAPY(data: any, fraxPool: any) {
   return { weighted, raw };
 }
 
-export async function calculatePrismaForwardAPR(data: any) {
-  const { strategy, chainId } = data;
-  const client = createPublicClient({
-    chain: getChainFromChainId(chainId),
-    transport: http(getRPCUrl(chainId)),
-  });
-  const [receiver] = (await client.readContract({
-    address: strategy.address,
-    abi: yprismaAbi as any,
-    functionName: 'prismaReceiver',
-    args: [],
-  })) as any;
-  if (receiver === zeroAddress) return null;
-  const [base, [, prismaAPY]] = await Promise.all([
-    calculateConvexForwardAPY({ ...data, lastDebtRatio: new Float(data.strategy?.debtRatio || 0) }),
-    getPrismaAPY(chainId, receiver),
-  ]);
-  const weighted = {
-    type: 'prisma',
-    debtRatio: base.weighted.debtRatio,
-    netAPY: base.weighted.netAPY + prismaAPY * base.weighted.debtRatio,
-    boost: base.weighted.boost,
-    poolAPY: base.weighted.poolAPY,
-    boostedAPR: base.weighted.boostedAPR,
-    baseAPR: base.weighted.baseAPR,
-    cvxAPR: base.weighted.cvxAPR,
-    rewardsAPY: base.weighted.rewardsAPY + prismaAPY * base.weighted.debtRatio,
-    keepCRV: base.weighted.keepCRV,
-  };
-
-  const raw = {
-    type: 'prisma',
-    debtRatio: base.raw.debtRatio,
-    netAPY: base.raw.netAPY + prismaAPY,
-    boost: base.raw.boost,
-    poolAPY: base.raw.poolAPY,
-    boostedAPR: base.raw.boostedAPR,
-    baseAPR: base.raw.baseAPR,
-    cvxAPR: base.raw.cvxAPR,
-    rewardsAPY: base.raw.rewardsAPY + prismaAPY,
-    keepCRV: base.raw.keepCRV,
-    address: base.raw.address,
-  };
-
-  return { weighted, raw };
-}
-
 export async function calculateGaugeBaseAPR(
   gauge: Gauge,
   crvTokenPrice: Float,
@@ -525,18 +472,6 @@ export async function calculateCurveLikeStrategyAPR(
   const rewardAPY = getRewardsAPY(pool as any);
   const poolWeeklyAPY = getPoolWeeklyAPY(subgraphItem);
 
-  if (isPrismaStrategy(strategy as any))
-    return calculatePrismaForwardAPR({
-      vault,
-      chainId,
-      gaugeAddress: gauge.gauge as any,
-      strategy: strategy as any,
-      baseAssetPrice,
-      poolPrice,
-      baseAPY,
-      rewardAPY,
-      poolWeeklyAPY,
-    });
   if (isFraxStrategy(strategy as any))
     return calculateFraxForwardAPY(
       {
