@@ -31,8 +31,7 @@ vi.mock('../src/helpers', async (orig) => {
     getCurveBoost: vi.fn(),
     determineConvexKeepCRV: vi.fn(),
     getConvexRewardAPY: vi.fn(),
-    getCVXForCRV: vi.fn(),
-    getPrismaAPY: vi.fn()
+    getCVXForCRV: vi.fn()
   }
 })
 
