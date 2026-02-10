@@ -24,6 +24,18 @@ export const KongWebhookSchema = z.object({
 });
 export type KongWebhook = z.infer<typeof KongWebhookSchema>;
 
+export const KongBatchWebhookSchema = z.object({
+  abiPath: z.string(),
+  blockNumber: z.bigint({ coerce: true }),
+  blockTime: z.bigint({ coerce: true }),
+  subscription: WebhookSubscriptionSchema,
+  vaults: z.array(z.object({
+    chainId: z.number(),
+    address: AddressSchema,
+  })),
+});
+export type KongBatchWebhook = z.infer<typeof KongBatchWebhookSchema>;
+
 export const OutputSchema = z.object({
   chainId: z.number(),
   address: AddressSchema,

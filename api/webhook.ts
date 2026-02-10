@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { KongWebhookSchema, OutputSchema } from '../src/types/schemas';
+import { KongBatchWebhookSchema, OutputSchema } from '../src/types/schemas';
 import { computeFapy } from '../src/output';
 
 function verifyWebhookSignature(
@@ -58,12 +58,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const hook = KongWebhookSchema.parse(req.body);
-
+    const hook = KongBatchWebhookSchema.parse(req.body);
     const outputs = await computeFapy(hook);
-
     const replacer = (_: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);
-
     res.status(200).send(JSON.stringify(OutputSchema.array().parse(outputs), replacer));
   } catch (err) {
     if (err instanceof z.ZodError) {

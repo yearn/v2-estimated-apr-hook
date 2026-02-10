@@ -23,10 +23,28 @@ export interface VaultAPY {
   debtRatio?: number;
 }
 
+export interface ChainData {
+  gauges: Awaited<ReturnType<typeof fetchGauges>>
+  pools: Awaited<ReturnType<typeof fetchPools>>
+  subgraph: Awaited<ReturnType<typeof fetchSubgraph>>
+  fraxPools: Awaited<ReturnType<typeof fetchFraxPools>>
+}
+
+export async function fetchChainData(chainId: number): Promise<ChainData> {
+  const [gauges, pools, subgraph, fraxPools] = await Promise.all([
+    fetchGauges(),
+    fetchPools(),
+    fetchSubgraph(chainId),
+    fetchFraxPools(),
+  ]);
+  return { gauges, pools, subgraph, fraxPools };
+}
+
 export async function computeChainAPY(
   vault: GqlVault,
   chainId: number,
   strategies: Array<GqlStrategy>,
+  chainData?: ChainData,
 ): Promise<VaultAPY | null> {
   const chain = getChainFromChainId(chainId)?.name?.toLowerCase();
 
@@ -44,12 +62,7 @@ export async function computeChainAPY(
     }
   }
 
-  const [gauges, pools, subgraph, fraxPools] = await Promise.all([
-    fetchGauges(),
-    fetchPools(),
-    fetchSubgraph(chainId),
-    fetchFraxPools(),
-  ]);
+  const { gauges, pools, subgraph, fraxPools } = chainData ?? await fetchChainData(chainId);
 
   if (isCurveStrategy(vault)) {
     return await computeCurveLikeForwardAPY({

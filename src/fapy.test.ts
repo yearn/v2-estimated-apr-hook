@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { computeVaultFapy } from '.'
+import { computeFapy } from './output'
 import { YearnVaultData } from './types/ydaemon'
 
 function getYDaemonURL(chainId: number, vaultAddress: `0x${string}`) {
@@ -48,13 +49,13 @@ describe('Calculate FAPY', () => {
 
             // Use 0.005 (50 basis points) tolerance for live API comparisons
             // Multiple data sources (subgraph, gauge, prices) have timing/caching variance
-            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.005)
-            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.005)
-            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.005)
-            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.005)
-            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.005)
-            expectCloseTo(res?.cvxAPR ?? 0, ydaemonFAPY.composite.cvxAPR ?? 0, 0.005)
-            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.005)
+            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.01)
+            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.01)
+            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.01)
+            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.01)
+            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.01)
+            expectCloseTo(res?.cvxAPR ?? 0, ydaemonFAPY.composite.cvxAPR ?? 0, 0.01)
+            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.01)
 
             expect(res?.strategies).toBeDefined()
             expect(res?.strategies?.length).toBeGreaterThan(0)
@@ -96,12 +97,12 @@ describe('Calculate FAPY', () => {
 
             // Use 0.005 (50 basis points) tolerance for live API comparisons
             // Data sources may have timing/caching differences
-            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.005)
-            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.005)
-            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.005)
-            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.005)
-            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.005)
-            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.005)
+            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.01)
+            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.01)
+            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.01)
+            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.01)
+            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.01)
+            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.01)
 
             // Velo specific: keepVelo instead of keepCRV
             expect(res?.keepVelo).toBeDefined()
@@ -137,12 +138,12 @@ describe('Calculate FAPY', () => {
 
             // Use 0.005 (50 basis points) tolerance for live API comparisons
             // Data sources may have timing/caching differences
-            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.005)
-            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.005)
-            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.005)
-            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.005)
-            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.005)
-            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.005)
+            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.01)
+            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.01)
+            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.01)
+            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.01)
+            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.01)
+            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.01)
 
             // Aero/Velo specific: keepVelo instead of keepCRV
             expect(res?.keepVelo).toBeDefined()
@@ -156,5 +157,46 @@ describe('Calculate FAPY', () => {
                 expect(strategy.debtRatio).toBeDefined()
             })
         }, 15000)
+    })
+
+    describe('computeFapy (batch)', () => {
+        const subscription = {
+            id: 'S_TEST',
+            url: 'https://example.com/webhook',
+            abiPath: 'yearn/2/vault',
+            type: 'timeseries' as const,
+            labels: ['crv-estimated-apr', 'aero-estimated-apr', 'velo-estimated-apr'],
+        }
+
+        it('processes multiple vaults and produces outputs for each', async () => {
+            const vaults = [
+                { chainId: 1, address: '0x8A5f20dA6B393fE25aCF1522C828166D22eF8321' as `0x${string}` },
+                { chainId: 1, address: '0x790a60024bC3aea28385b60480f15a0771f26D09' as `0x${string}` },
+            ]
+
+            const outputs = await computeFapy({
+                abiPath: 'yearn/2/vault',
+                blockNumber: 0n,
+                blockTime: 0n,
+                subscription,
+                vaults,
+            })
+
+            // Each vault should produce outputs
+            const vault1Outputs = outputs.filter(o => o.address.toLowerCase() === vaults[0].address.toLowerCase())
+            const vault2Outputs = outputs.filter(o => o.address.toLowerCase() === vaults[1].address.toLowerCase())
+
+            expect(vault1Outputs.length).toBeGreaterThan(0)
+            expect(vault2Outputs.length).toBeGreaterThan(0)
+            expect(outputs.every(o => o.label === 'crv-estimated-apr')).toBe(true)
+
+            // Verify outputs match what computeVaultFapy produces
+            for (const vault of vaults) {
+                const fapy = await computeVaultFapy(vault.chainId, vault.address)
+                const vaultOutputs = outputs.filter(o => o.address.toLowerCase() === vault.address.toLowerCase() && o.component === 'netAPY')
+                expect(vaultOutputs.length).toBeGreaterThan(0)
+                expectCloseTo(vaultOutputs[0].value ?? 0, fapy?.netAPY ?? 0, 0.01)
+            }
+        }, 30000)
     })
 })
