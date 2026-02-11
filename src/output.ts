@@ -129,5 +129,5 @@ export async function computeFapy(hook: KongBatchWebhook): Promise<Output[]> {
     }
   }
 
-  return OutputSchema.array().parse(outputs);
+  return outputs;
 }

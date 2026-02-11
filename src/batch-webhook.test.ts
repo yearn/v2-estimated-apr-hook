@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createHmac } from 'node:crypto';
 import { KongBatchWebhookSchema } from './types/schemas';
 
 const VAULT_A = '0xaA00000000000000000000000000000000000001' as `0x${string}`;
@@ -276,7 +277,6 @@ describe('webhook handler', () => {
   });
 
   function makeSignature(body: string, secret = 'test-secret') {
-    const { createHmac } = require('node:crypto');
     const timestamp = Math.floor(Date.now() / 1000);
     const sig = createHmac('sha256', secret).update(`${timestamp}.${body}`, 'utf8').digest('hex');
     return `t=${timestamp},v1=${sig}`;
