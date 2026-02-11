@@ -92,40 +92,34 @@ async function computeVaultOutputs(
 }
 
 export async function computeFapy(hook: KongBatchWebhook): Promise<Output[]> {
-  const chainGroups = new Map<number, `0x${string}`[]>();
-  for (const vault of hook.vaults) {
-    if (!chainGroups.has(vault.chainId)) chainGroups.set(vault.chainId, []);
-    chainGroups.get(vault.chainId)!.push(vault.address);
-  }
+  const { chainId, vaults: addresses } = hook;
+  if (addresses.length === 0) return [];
+
+  const [vaultsMap, chainData] = await Promise.all([
+    getVaultsWithStrategies(chainId, addresses),
+    fetchChainData(chainId),
+  ]);
+
+  const results = await Promise.allSettled(
+    addresses.map(async (address) => {
+      const vaultData = vaultsMap.get(address.toLowerCase());
+      if (!vaultData) return [];
+
+      return computeVaultOutputs(
+        chainId, address,
+        vaultData.vault, vaultData.strategies,
+        hook.blockNumber, hook.blockTime,
+        chainData,
+      );
+    })
+  );
 
   const outputs: Output[] = [];
-
-  for (const [chainId, addresses] of chainGroups) {
-    const [vaultsMap, chainData] = await Promise.all([
-      getVaultsWithStrategies(chainId, addresses),
-      fetchChainData(chainId),
-    ]);
-
-    const results = await Promise.allSettled(
-      addresses.map(async (address) => {
-        const vaultData = vaultsMap.get(address.toLowerCase());
-        if (!vaultData) return [];
-
-        return computeVaultOutputs(
-          chainId, address,
-          vaultData.vault, vaultData.strategies,
-          hook.blockNumber, hook.blockTime,
-          chainData,
-        );
-      })
-    );
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        outputs.push(...result.value);
-      } else {
-        console.error('Error processing vault in batch:', result.reason);
-      }
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      outputs.push(...result.value);
+    } else {
+      console.error('Error processing vault in batch:', result.reason);
     }
   }
 

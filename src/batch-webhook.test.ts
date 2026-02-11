@@ -21,26 +21,25 @@ describe('KongBatchWebhookSchema', () => {
   it('parses a valid batch payload', () => {
     const result = KongBatchWebhookSchema.parse({
       abiPath: 'yearn/2/vault',
+      chainId: 1,
       blockNumber: '123456',
       blockTime: '1700000000',
       subscription,
-      vaults: [
-        { chainId: 1, address: VAULT_A },
-        { chainId: 1, address: VAULT_B },
-        { chainId: 10, address: VAULT_C },
-      ],
+      vaults: [VAULT_A, VAULT_B, VAULT_C],
     });
     expect(result.vaults).toHaveLength(3);
     expect(result.blockNumber).toBe(123456n);
+    expect(result.chainId).toBe(1);
   });
 
   it('coerces blockNumber and blockTime from numbers', () => {
     const result = KongBatchWebhookSchema.parse({
       abiPath: 'yearn/2/vault',
+      chainId: 1,
       blockNumber: 999,
       blockTime: 1000,
       subscription,
-      vaults: [{ chainId: 1, address: VAULT_A }],
+      vaults: [VAULT_A],
     });
     expect(result.blockNumber).toBe(999n);
   });
@@ -49,10 +48,11 @@ describe('KongBatchWebhookSchema', () => {
     expect(() =>
       KongBatchWebhookSchema.parse({
         abiPath: 'yearn/2/vault',
+        chainId: 1,
         blockNumber: '1',
         blockTime: '1',
         subscription,
-        vaults: [{ chainId: 1, address: 'not-an-address' }],
+        vaults: ['not-an-address'],
       }),
     ).toThrow();
   });
@@ -61,6 +61,7 @@ describe('KongBatchWebhookSchema', () => {
     expect(() =>
       KongBatchWebhookSchema.parse({
         abiPath: 'yearn/2/vault',
+        chainId: 1,
         blockNumber: '1',
         blockTime: '1',
         subscription,
@@ -110,8 +111,9 @@ const mockFapy = () => ({
   keepCRV: 0.1,
 });
 
-const makeHook = (vaults: { chainId: number, address: `0x${string}` }[]) => ({
+const makeHook = (chainId: number, vaults: `0x${string}`[]) => ({
   abiPath: 'yearn/2/vault',
+  chainId,
   blockNumber: 100n,
   blockTime: 200n,
   subscription,
@@ -138,10 +140,7 @@ describe('computeFapy', () => {
     vi.mocked(getVaultsWithStrategies).mockResolvedValue(vaultsMap as any);
     vi.mocked(computeChainAPY).mockResolvedValue(mockFapy());
 
-    const outputs = await computeFapy(makeHook([
-      { chainId: 1, address: VAULT_A },
-      { chainId: 1, address: VAULT_B },
-    ]));
+    const outputs = await computeFapy(makeHook(1, [VAULT_A, VAULT_B]));
 
     // 10 CRV components per vault * 2 vaults = 20
     expect(outputs).toHaveLength(20);
@@ -158,35 +157,22 @@ describe('computeFapy', () => {
     vi.mocked(getVaultsWithStrategies).mockResolvedValue(vaultsMap as any);
     vi.mocked(computeChainAPY).mockResolvedValue(mockFapy());
 
-    await computeFapy(makeHook([
-      { chainId: 1, address: VAULT_A },
-      { chainId: 1, address: VAULT_B },
-    ]));
+    await computeFapy(makeHook(1, [VAULT_A, VAULT_B]));
 
     expect(fetchChainData).toHaveBeenCalledTimes(1);
     expect(fetchChainData).toHaveBeenCalledWith(1);
   });
 
-  it('groups vaults by chain and fetches data per chain', async () => {
-    const chain1Map = new Map([
-      [VAULT_A.toLowerCase(), { vault: mockVault(VAULT_A, 1), strategies: [] }],
+  it('calls getVaultsWithStrategies and fetchChainData with the hook chainId', async () => {
+    const vaultsMap = new Map([
+      [VAULT_A.toLowerCase(), { vault: mockVault(VAULT_A, 10), strategies: [] }],
     ]);
-    const chain10Map = new Map([
-      [VAULT_C.toLowerCase(), { vault: mockVault(VAULT_C, 10), strategies: [] }],
-    ]);
-    vi.mocked(getVaultsWithStrategies)
-      .mockResolvedValueOnce(chain1Map as any)
-      .mockResolvedValueOnce(chain10Map as any);
+    vi.mocked(getVaultsWithStrategies).mockResolvedValue(vaultsMap as any);
     vi.mocked(computeChainAPY).mockResolvedValue(mockFapy());
 
-    await computeFapy(makeHook([
-      { chainId: 1, address: VAULT_A },
-      { chainId: 10, address: VAULT_C },
-    ]));
+    await computeFapy(makeHook(10, [VAULT_A]));
 
-    expect(getVaultsWithStrategies).toHaveBeenCalledTimes(2);
-    expect(fetchChainData).toHaveBeenCalledTimes(2);
-    expect(fetchChainData).toHaveBeenCalledWith(1);
+    expect(getVaultsWithStrategies).toHaveBeenCalledWith(10, [VAULT_A]);
     expect(fetchChainData).toHaveBeenCalledWith(10);
   });
 
@@ -199,7 +185,7 @@ describe('computeFapy', () => {
     vi.mocked(getVaultsWithStrategies).mockResolvedValue(vaultsMap as any);
     vi.mocked(computeChainAPY).mockResolvedValue(mockFapy());
 
-    await computeFapy(makeHook([{ chainId: 1, address: VAULT_A }]));
+    await computeFapy(makeHook(1, [VAULT_A]));
 
     expect(computeChainAPY).toHaveBeenCalledWith(
       expect.anything(), 1, expect.anything(), chainData,
@@ -216,10 +202,7 @@ describe('computeFapy', () => {
       .mockRejectedValueOnce(new Error('RPC error'))
       .mockResolvedValueOnce(mockFapy());
 
-    const outputs = await computeFapy(makeHook([
-      { chainId: 1, address: VAULT_A },
-      { chainId: 1, address: VAULT_B },
-    ]));
+    const outputs = await computeFapy(makeHook(1, [VAULT_A, VAULT_B]));
 
     expect(outputs).toHaveLength(10);
     expect(outputs.every(o => o.address === VAULT_B)).toBe(true);
@@ -232,17 +215,14 @@ describe('computeFapy', () => {
     vi.mocked(getVaultsWithStrategies).mockResolvedValue(vaultsMap as any);
     vi.mocked(computeChainAPY).mockResolvedValue(mockFapy());
 
-    const outputs = await computeFapy(makeHook([
-      { chainId: 1, address: VAULT_A },
-      { chainId: 1, address: VAULT_B },
-    ]));
+    const outputs = await computeFapy(makeHook(1, [VAULT_A, VAULT_B]));
 
     expect(outputs).toHaveLength(10);
     expect(outputs.every(o => o.address === VAULT_A)).toBe(true);
   });
 
   it('returns empty array for empty vaults', async () => {
-    const outputs = await computeFapy(makeHook([]));
+    const outputs = await computeFapy(makeHook(1, []));
     expect(outputs).toHaveLength(0);
   });
 
@@ -256,7 +236,7 @@ describe('computeFapy', () => {
       strategies: [{ address: STRATEGY_A, netAPR: 0.04, debtRatio: 5000 }],
     });
 
-    const outputs = await computeFapy(makeHook([{ chainId: 1, address: VAULT_A }]));
+    const outputs = await computeFapy(makeHook(1, [VAULT_A]));
 
     const stratOutputs = outputs.filter(o => o.address === STRATEGY_A);
     expect(stratOutputs.length).toBe(11); // 10 CRV components + debtRatio
@@ -306,10 +286,11 @@ describe('webhook handler', () => {
 
     const body = {
       abiPath: 'yearn/2/vault',
+      chainId: 1,
       blockNumber: '100',
       blockTime: '200',
       subscription,
-      vaults: [{ chainId: 1, address: VAULT_A }],
+      vaults: [VAULT_A],
     };
     const { req, res } = mockReqRes(body);
 
