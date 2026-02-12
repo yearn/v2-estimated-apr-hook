@@ -169,31 +169,32 @@ describe('Calculate FAPY', () => {
         }
 
         it('processes multiple vaults and produces outputs for each', async () => {
-            const vaults = [
-                { chainId: 1, address: '0x8A5f20dA6B393fE25aCF1522C828166D22eF8321' as `0x${string}` },
-                { chainId: 1, address: '0x790a60024bC3aea28385b60480f15a0771f26D09' as `0x${string}` },
+            const addresses = [
+                '0x8A5f20dA6B393fE25aCF1522C828166D22eF8321' as `0x${string}`,
+                '0x790a60024bC3aea28385b60480f15a0771f26D09' as `0x${string}`,
             ]
 
             const outputs = await computeFapy({
                 abiPath: 'yearn/2/vault',
+                chainId: 1,
                 blockNumber: 0n,
                 blockTime: 0n,
                 subscription,
-                vaults,
+                vaults: addresses,
             })
 
             // Each vault should produce outputs
-            const vault1Outputs = outputs.filter(o => o.address.toLowerCase() === vaults[0].address.toLowerCase())
-            const vault2Outputs = outputs.filter(o => o.address.toLowerCase() === vaults[1].address.toLowerCase())
+            const vault1Outputs = outputs.filter(o => o.address.toLowerCase() === addresses[0].toLowerCase())
+            const vault2Outputs = outputs.filter(o => o.address.toLowerCase() === addresses[1].toLowerCase())
 
             expect(vault1Outputs.length).toBeGreaterThan(0)
             expect(vault2Outputs.length).toBeGreaterThan(0)
             expect(outputs.every(o => o.label === 'crv-estimated-apr')).toBe(true)
 
             // Verify outputs match what computeVaultFapy produces
-            for (const vault of vaults) {
-                const fapy = await computeVaultFapy(vault.chainId, vault.address)
-                const vaultOutputs = outputs.filter(o => o.address.toLowerCase() === vault.address.toLowerCase() && o.component === 'netAPY')
+            for (const address of addresses) {
+                const fapy = await computeVaultFapy(1, address)
+                const vaultOutputs = outputs.filter(o => o.address.toLowerCase() === address.toLowerCase() && o.component === 'netAPY')
                 expect(vaultOutputs.length).toBeGreaterThan(0)
                 expectCloseTo(vaultOutputs[0].value ?? 0, fapy?.netAPY ?? 0, 0.01)
             }
