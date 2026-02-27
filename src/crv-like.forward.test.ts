@@ -1,6 +1,6 @@
 import { describe, beforeEach, it, vi, expect } from 'vitest'
 import { Float } from './helpers/bignumber-float'
-import { determineCurveKeepCRV, getPoolWeeklyAPY, getRewardsAPY } from './crv-like.forward'
+import { calculateGaugeBaseAPR, computeCurveLikeForwardAPY, determineCurveKeepCRV, getPoolWeeklyAPY, getRewardsAPY } from './crv-like.forward'
 import * as forwardAPY from './crv-like.forward'
 import * as helpers from './helpers'
 import { convertFloatAPRToAPY } from './helpers/calculation.helper'
@@ -134,6 +134,74 @@ describe('crv-like.forward core helpers', () => {
     // APY = (1 + 0.10/52)^52 - 1 ≈ 0.1047
     expect(result2).toBeGreaterThan(0.104)
     expect(result2).toBeLessThan(0.106)
+  })
+
+  it('computeCurveLikeForwardAPY returns zero for killed gauge', async () => {
+    const killedGauge: any = {
+      gauge: '0xGauge',
+      swap: '0xSwap',
+      swap_token: '0xAsset',
+      is_killed: true,
+      hasNoCrv: false,
+    }
+    const vault: any = { asset: { address: '0xAsset' } }
+
+    const result = await computeCurveLikeForwardAPY({
+      vault,
+      gauges: [killedGauge],
+      pools: [],
+      subgraphData: [],
+      fraxPools: [],
+      allStrategiesForVault: [],
+      chainId: 1,
+    })
+
+    expect(result).toEqual({ type: '', netAPY: 0 })
+  })
+
+  it('computeCurveLikeForwardAPY returns zero for gauge with hasNoCrv', async () => {
+    const noCrvGauge: any = {
+      gauge: '0xGauge',
+      swap: '0xSwap',
+      swap_token: '0xAsset',
+      is_killed: false,
+      hasNoCrv: true,
+    }
+    const vault: any = { asset: { address: '0xAsset' } }
+
+    const result = await computeCurveLikeForwardAPY({
+      vault,
+      gauges: [noCrvGauge],
+      pools: [],
+      subgraphData: [],
+      fraxPools: [],
+      allStrategiesForVault: [],
+      chainId: 1,
+    })
+
+    expect(result).toEqual({ type: '', netAPY: 0 })
+  })
+
+  it('calculateGaugeBaseAPR returns zero when working supply is zero', async () => {
+    const gauge: any = {
+      gauge_controller: {
+        inflation_rate: '1000000000000000000',
+        gauge_relative_weight: '1000000000000000000',
+      },
+      gauge_data: {
+        working_supply: '0',
+      },
+    }
+
+    const result = await calculateGaugeBaseAPR(
+      gauge,
+      new Float(1),
+      new Float(1),
+      new Float(1),
+    )
+
+    expect(result.baseAPR.isZero()).toBe(true)
+    expect(result.baseAPY.isZero()).toBe(true)
   })
 
   it('poolAPY is added AFTER fee deduction in Curve forward APY', async () => {
