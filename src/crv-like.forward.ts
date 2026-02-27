@@ -433,6 +433,9 @@ export async function calculateGaugeBaseAPR(
   );
   const secondsPerYear = new Float(31556952); // Match Go exactly
   const workingSupply = toNormalizedAmount(new BigNumberInt(gauge.gauge_data.working_supply), 18);
+  if (workingSupply.isZero()) {
+    return { baseAPY: new Float(0), baseAPR: new Float(0) };
+  }
   const perMaxBoost = new Float(0.4);
 
   const crvPrice = crvTokenPrice instanceof Float ? crvTokenPrice : new Float(crvTokenPrice);
@@ -534,6 +537,7 @@ export async function computeCurveLikeForwardAPY({
   const vaultAsset = vault.asset?.address as `0x${string}`;
   const gauge = findGaugeForVault(vaultAsset, gauges);
   if (!gauge) return { type: '', netAPY: 0 };
+  if (gauge.is_killed || gauge.hasNoCrv) return { type: '', netAPY: 0 };
   const pool = findPoolForVault(vaultAsset, pools);
   const fraxPool = findFraxPoolForVault(vaultAsset, fraxPools);
   const subgraphItem = findSubgraphItemForVault(gauge.swap, subgraphData);
