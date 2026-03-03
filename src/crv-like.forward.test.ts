@@ -136,7 +136,7 @@ describe('crv-like.forward core helpers', () => {
     expect(result2).toBeLessThan(0.106)
   })
 
-  it('computeCurveLikeForwardAPY returns zero for killed gauge', async () => {
+  it('computeCurveLikeForwardAPY returns null for killed gauge', async () => {
     const killedGauge: any = {
       gauge: '0xGauge',
       swap: '0xSwap',
@@ -156,10 +156,10 @@ describe('crv-like.forward core helpers', () => {
       chainId: 1,
     })
 
-    expect(result).toEqual({ type: '', netAPY: 0 })
+    expect(result).toBeNull()
   })
 
-  it('computeCurveLikeForwardAPY returns zero for gauge with hasNoCrv', async () => {
+  it('computeCurveLikeForwardAPY returns null for gauge with hasNoCrv', async () => {
     const noCrvGauge: any = {
       gauge: '0xGauge',
       swap: '0xSwap',
@@ -179,7 +179,7 @@ describe('crv-like.forward core helpers', () => {
       chainId: 1,
     })
 
-    expect(result).toEqual({ type: '', netAPY: 0 })
+    expect(result).toBeNull()
   })
 
   it('calculateGaugeBaseAPR returns zero when working supply is zero', async () => {

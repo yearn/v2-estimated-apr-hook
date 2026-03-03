@@ -196,7 +196,7 @@ describe('velo-like.forward core helpers', () => {
   })
 
   describe('computeVeloLikeForwardAPY', () => {
-    it('returns empty result when no asset address', async () => {
+    it('returns null when no asset address', async () => {
       const vault: any = { asset: null }
       const strategies: any[] = []
 
@@ -206,11 +206,10 @@ describe('velo-like.forward core helpers', () => {
         chainId: 10,
       })
 
-      expect(result.type).toBe('')
-      expect(result.netAPY).toBe(0)
+      expect(result).toBeNull()
     })
 
-    it('returns empty result when not a velo-like vault', async () => {
+    it('returns null when not a velo-like vault', async () => {
       const vault: any = { asset: { address: hex('0xAsset') } }
       const strategies: any[] = []
 
@@ -222,8 +221,7 @@ describe('velo-like.forward core helpers', () => {
         chainId: 10,
       })
 
-      expect(result.type).toBe('')
-      expect(result.netAPY).toBe(0)
+      expect(result).toBeNull()
     })
 
     it('aggregates APY from multiple strategies', async () => {

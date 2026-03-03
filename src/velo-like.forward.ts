@@ -284,15 +284,15 @@ export async function computeVeloLikeForwardAPY({
   vault: GqlVault;
   allStrategiesForVault: GqlStrategy[];
   chainId: number;
-}): Promise<VaultAPY> {
+}): Promise<VaultAPY | null> {
   const assetAddress = vault.asset?.address as `0x${string}`;
   if (!assetAddress) {
-    return { type: '', netAPY: 0 };
+    return null;
   }
 
   const [gaugeAddress, isVeloLike] = await isVeloLikeVault(chainId, assetAddress);
   if (!isVeloLike || !gaugeAddress) {
-    return { type: '', netAPY: 0 };
+    return null;
   }
 
   let typeOf = '';

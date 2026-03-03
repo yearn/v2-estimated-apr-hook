@@ -239,8 +239,10 @@ describe('computeFapy', () => {
     const outputs = await computeFapy(makeHook(1, [VAULT_A]));
 
     const stratOutputs = outputs.filter(o => o.address === STRATEGY_A);
-    expect(stratOutputs.length).toBe(11); // 10 CRV components + debtRatio
     expect(stratOutputs.some(o => o.component === 'debtRatio')).toBe(true);
+    expect(stratOutputs.some(o => o.component === 'netAPR')).toBe(true);
+    // Only components with non-null values are included
+    expect(stratOutputs.length).toBe(2); // netAPR + debtRatio
   });
 });
 
