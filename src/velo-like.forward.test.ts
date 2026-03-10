@@ -196,7 +196,7 @@ describe('velo-like.forward core helpers', () => {
   })
 
   describe('computeVeloLikeForwardAPY', () => {
-    it('returns empty result when no asset address', async () => {
+    it('returns null when no asset address', async () => {
       const vault: any = { asset: null }
       const strategies: any[] = []
 
@@ -206,11 +206,10 @@ describe('velo-like.forward core helpers', () => {
         chainId: 10,
       })
 
-      expect(result.type).toBe('')
-      expect(result.netAPY).toBe(0)
+      expect(result).toBeNull()
     })
 
-    it('returns empty result when not a velo-like vault', async () => {
+    it('returns null when not a velo-like vault', async () => {
       const vault: any = { asset: { address: hex('0xAsset') } }
       const strategies: any[] = []
 
@@ -222,8 +221,7 @@ describe('velo-like.forward core helpers', () => {
         chainId: 10,
       })
 
-      expect(result.type).toBe('')
-      expect(result.netAPY).toBe(0)
+      expect(result).toBeNull()
     })
 
     it('aggregates APY from multiple strategies', async () => {
@@ -263,16 +261,17 @@ describe('velo-like.forward core helpers', () => {
         chainId: 10,
       })
 
-      expect(result.type).toContain('v2:velo')
+      expect(result).not.toBeNull()
+      expect(result!.type).toContain('v2:velo')
       expect(result).toHaveProperty('netAPY')
       expect(result).toHaveProperty('keepVelo')
-      expect(result.strategies).toHaveLength(2)
+      expect(result!.strategies).toHaveLength(2)
 
-      const s1 = result.strategies![0]
+      const s1 = result!.strategies![0]
       expect(s1.address).toBe(strategies[0].address)
       expect(s1.debtRatio).toBe(0.5)
 
-      const s2 = result.strategies![1]
+      const s2 = result!.strategies![1]
       expect(s2.address).toBe(strategies[1].address)
       expect(s2.debtRatio).toBe(0.5)
     })
@@ -308,8 +307,9 @@ describe('velo-like.forward core helpers', () => {
       })
 
       expect(mockMulticall).toHaveBeenCalledTimes(1)
-      expect(result.strategies).toHaveLength(1)
-      const strategy = result.strategies![0]
+      expect(result).not.toBeNull()
+      expect(result!.strategies).toHaveLength(1)
+      const strategy = result!.strategies![0]
       expect(strategy.address).toBe(strategies[1].address)
       expect(strategy.debtRatio).toBe(1) // 10000 bps -> 1.0 (normalized)
       expect(strategy.netAPY).toBeGreaterThan(0)

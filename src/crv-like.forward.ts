@@ -532,12 +532,12 @@ export async function computeCurveLikeForwardAPY({
   fraxPools: FraxPool[];
   allStrategiesForVault: GqlStrategy[];
   chainId: number;
-}): Promise<VaultAPY> {
+}): Promise<VaultAPY | null> {
   // Match kong logic: use vault.defaults.asset directly
   const vaultAsset = vault.asset?.address as `0x${string}`;
   const gauge = findGaugeForVault(vaultAsset, gauges);
-  if (!gauge) return { type: '', netAPY: 0 };
-  if (gauge.is_killed || gauge.hasNoCrv) return { type: '', netAPY: 0 };
+  if (!gauge) return null;
+  if (gauge.is_killed || gauge.hasNoCrv) return null;
   const pool = findPoolForVault(vaultAsset, pools);
   const fraxPool = findFraxPoolForVault(vaultAsset, fraxPools);
   const subgraphItem = findSubgraphItemForVault(gauge.swap, subgraphData);

@@ -59,32 +59,38 @@ async function computeVaultOutputs(
     components = CRV_COMPONENTS;
   }
 
-  const outputs: Output[] = components.map((component) =>
-    OutputSchema.parse({
+  const outputs: Output[] = [];
+
+  for (const component of components) {
+    const value = fapy[component as keyof typeof fapy];
+    if (value == null) continue;
+    outputs.push(OutputSchema.parse({
       chainId,
       address,
       label,
       component,
-      value: fapy[component as keyof typeof fapy] ?? 0,
+      value,
       blockNumber,
       blockTime,
-    }),
-  );
+    }));
+  }
 
   if (fapy.strategies) {
     for (const strategy of fapy.strategies) {
       const strategyComponents = [...components, 'debtRatio'];
-      outputs.push(...strategyComponents.map((component) =>
-        OutputSchema.parse({
+      for (const component of strategyComponents) {
+        const value = strategy[component as keyof typeof strategy];
+        if (value == null) continue;
+        outputs.push(OutputSchema.parse({
           chainId,
           address: strategy.address as `0x${string}`,
           label,
           component,
-          value: strategy[component as keyof typeof strategy] ?? 0,
+          value,
           blockNumber,
           blockTime,
-        }),
-      ));
+        }));
+      }
     }
   }
 
