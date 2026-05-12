@@ -1,5 +1,5 @@
 import { createPublicClient, http } from 'viem';
-import { getChainFromChainId } from '../utils/rpcs';
+import { getChainFromChainId, getRPCUrl } from '../utils/rpcs';
 import { Float } from './bignumber-float';
 import { BigNumberInt, toNormalizedAmount } from './bignumber-int';
 import { GqlVault } from '../types/kongTypes';
@@ -34,7 +34,7 @@ export interface TVaultAPY {
 async function getBlockNumberByPeriod(chainId: number, daysAgo: number): Promise<bigint> {
     const client = createPublicClient({
         chain: getChainFromChainId(chainId),
-        transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+        transport: http(getRPCUrl(chainId)),
     });
 
     if (daysAgo === 0) {
@@ -60,7 +60,7 @@ async function fetchPricePerShare(
 ): Promise<Float> {
     const client = createPublicClient({
         chain: getChainFromChainId(chainId),
-        transport: http(process.env[`RPC_CHAIN_URL_${chainId}`]!),
+        transport: http(getRPCUrl(chainId)),
     });
 
     try {

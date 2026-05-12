@@ -10,7 +10,7 @@ export const WebhookSubscriptionSchema = z.object({
   url: z.string().url(),
   abiPath: z.string(),
   type: z.enum(['timeseries']),
-  label: z.string(),
+  labels: z.array(z.string()),
 });
 export type WebhookSubscription = z.infer<typeof WebhookSubscriptionSchema>;
 
@@ -23,6 +23,16 @@ export const KongWebhookSchema = z.object({
   subscription: WebhookSubscriptionSchema,
 });
 export type KongWebhook = z.infer<typeof KongWebhookSchema>;
+
+export const KongBatchWebhookSchema = z.object({
+  abiPath: z.string(),
+  chainId: z.number(),
+  blockNumber: z.bigint({ coerce: true }),
+  blockTime: z.bigint({ coerce: true }),
+  subscription: WebhookSubscriptionSchema,
+  vaults: z.array(AddressSchema),
+});
+export type KongBatchWebhook = z.infer<typeof KongBatchWebhookSchema>;
 
 export const OutputSchema = z.object({
   chainId: z.number(),

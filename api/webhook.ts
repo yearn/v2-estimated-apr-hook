@@ -1,9 +1,9 @@
-import 'dotenv/config';
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { z } from 'zod';
+import 'dotenv/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { KongWebhookSchema, OutputSchema } from '../src/types/schemas';
+import { z } from 'zod';
 import { computeFapy } from '../src/output';
+import { KongBatchWebhookSchema, OutputSchema } from '../src/types/schemas';
 
 function verifyWebhookSignature(
   signatureHeader: string,
@@ -58,18 +58,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const hook = KongWebhookSchema.parse(req.body);
-
+    const hook = KongBatchWebhookSchema.parse(req.body);
     const outputs = await computeFapy(hook);
-
+    
     const replacer = (_: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);
 
+    if(outputs.length === 0) {
+      return res.status(204).json({ message: 'No outputs generated for fapy computation' });
+    }
+
     res.status(200).send(JSON.stringify(OutputSchema.array().parse(outputs), replacer));
+
   } catch (err) {
+    console.error('fapy webhook error', err);
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: 'invalid payload', issues: err.issues });
     }
-    console.error('fapy webhook error', err);
     return res.status(500).json({ error: 'internal error' });
   }
 }

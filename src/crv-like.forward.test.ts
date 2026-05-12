@@ -1,8 +1,9 @@
 import { describe, beforeEach, it, vi, expect } from 'vitest'
 import { Float } from './helpers/bignumber-float'
-import { determineCurveKeepCRV, getPoolWeeklyAPY, getRewardsAPY } from './crv-like.forward'
+import { calculateGaugeBaseAPR, computeCurveLikeForwardAPY, determineCurveKeepCRV, getPoolWeeklyAPY, getRewardsAPY } from './crv-like.forward'
 import * as forwardAPY from './crv-like.forward'
 import * as helpers from './helpers'
+import { convertFloatAPRToAPY } from './helpers/calculation.helper'
 
 const mockReadContract = vi.fn()
 const mockMulticall = vi.fn()
@@ -30,8 +31,7 @@ vi.mock('../src/helpers', async (orig) => {
     getCurveBoost: vi.fn(),
     determineConvexKeepCRV: vi.fn(),
     getConvexRewardAPY: vi.fn(),
-    getCVXForCRV: vi.fn(),
-    getPrismaAPY: vi.fn()
+    getCVXForCRV: vi.fn()
   }
 })
 
@@ -102,11 +102,140 @@ describe('crv-like.forward core helpers', () => {
     vi.spyOn(forwardAPY, 'determineCurveKeepCRV').mockResolvedValueOnce(0)
     mockMulticall.mockResolvedValueOnce([{ result: BigInt(2e6) }])
 
-    const res = await forwardAPY.calculateCurveForwardAPY(data as any)
+    const { weighted: res, raw } = await forwardAPY.calculateCurveForwardAPY(data as any)
 
     expect(res).toHaveProperty('type', 'crv')
     expect(res).toHaveProperty('netAPY')
     expect(res).toHaveProperty('boost')
     expect(res.netAPY).toBeGreaterThan(0) // performance/mgmt fees are 0 so should be positive
+
+    // With new logic:
+    // grossAPY = baseAPY * boost * (1 - keepCRV) + rewardAPY = 0.05 * 2.5 * 1 + 0.02 = 0.145
+    // netAPR = 0.145 (no fees)
+    // netAPY = convertFloatAPRToAPY(0.145, 52) + poolAPY ≈ 0.1556 + 0.01 ≈ 0.1656
+    expect(res.netAPY).toBeGreaterThan(0.16)
+    expect(res.netAPY).toBeLessThan(0.17)
+
+    expect(raw.address).toBe(data.strategy.address)
+    expect(raw.debtRatio).toBe(data.lastDebtRatio.toNumber() / 10000)
+    expect(raw.netAPY).toBeGreaterThan(0)
   })
+
+  it('convertFloatAPRToAPY accepts decimal inputs and returns decimal output', () => {
+    // Test with 56% APR (0.56 as decimal)
+    const result = convertFloatAPRToAPY(0.56, 52)
+
+    // APY = (1 + 0.56/52)^52 - 1 ≈ 0.7405
+    expect(result).toBeGreaterThan(0.74)
+    expect(result).toBeLessThan(0.75)
+
+    // Test with 10% APR (0.10 as decimal)
+    const result2 = convertFloatAPRToAPY(0.10, 52)
+    // APY = (1 + 0.10/52)^52 - 1 ≈ 0.1047
+    expect(result2).toBeGreaterThan(0.104)
+    expect(result2).toBeLessThan(0.106)
+  })
+
+  it('computeCurveLikeForwardAPY returns null for killed gauge', async () => {
+    const killedGauge: any = {
+      gauge: '0xGauge',
+      swap: '0xSwap',
+      swap_token: '0xAsset',
+      is_killed: true,
+      hasNoCrv: false,
+    }
+    const vault: any = { asset: { address: '0xAsset' } }
+
+    const result = await computeCurveLikeForwardAPY({
+      vault,
+      gauges: [killedGauge],
+      pools: [],
+      subgraphData: [],
+      fraxPools: [],
+      allStrategiesForVault: [],
+      chainId: 1,
+    })
+
+    expect(result).toBeNull()
+  })
+
+  it('computeCurveLikeForwardAPY returns null for gauge with hasNoCrv', async () => {
+    const noCrvGauge: any = {
+      gauge: '0xGauge',
+      swap: '0xSwap',
+      swap_token: '0xAsset',
+      is_killed: false,
+      hasNoCrv: true,
+    }
+    const vault: any = { asset: { address: '0xAsset' } }
+
+    const result = await computeCurveLikeForwardAPY({
+      vault,
+      gauges: [noCrvGauge],
+      pools: [],
+      subgraphData: [],
+      fraxPools: [],
+      allStrategiesForVault: [],
+      chainId: 1,
+    })
+
+    expect(result).toBeNull()
+  })
+
+  it('calculateGaugeBaseAPR returns zero when working supply is zero', async () => {
+    const gauge: any = {
+      gauge_controller: {
+        inflation_rate: '1000000000000000000',
+        gauge_relative_weight: '1000000000000000000',
+      },
+      gauge_data: {
+        working_supply: '0',
+      },
+    }
+
+    const result = await calculateGaugeBaseAPR(
+      gauge,
+      new Float(1),
+      new Float(1),
+      new Float(1),
+    )
+
+    expect(result.baseAPR.isZero()).toBe(true)
+    expect(result.baseAPY.isZero()).toBe(true)
+  })
+
+  it('poolAPY is added AFTER fee deduction in Curve forward APY', async () => {
+    const data = {
+      gaugeAddress: hex('0xG'),
+      vault: { performanceFee: 2000, managementFee: 200, apiVersion: '0.4.0' } as any, // 20% perf fee, 2% mgmt fee
+      strategy: { address: hex('0xS'), performanceFee: 2000, managementFee: 200, debtRatio: 10000, apiVersion: '0.4.0' } as any,
+      baseAPY: new Float(0.05),
+      rewardAPY: new Float(0.02),
+      poolAPY: new Float(0.03), // 3% pool APY
+      chainId: 1,
+      lastDebtRatio: new Float(10000)
+    }
+
+    vi.spyOn(helpers, 'getCurveBoost' as any).mockResolvedValueOnce(new Float(2.5))
+    vi.spyOn(forwardAPY, 'determineCurveKeepCRV').mockResolvedValueOnce(0)
+    mockMulticall.mockResolvedValueOnce([{ result: BigInt(2e6) }])
+
+    const { weighted: res, raw } = await forwardAPY.calculateCurveForwardAPY(data as any)
+
+    // grossAPY = 0.05 * 2.5 * 1 + 0.02 = 0.145
+    // netAPR = 0.145 * 0.8 - 0.02 = 0.116 - 0.02 = 0.096
+    // netAPY = convertFloatAPRToAPY(0.096, 52) + poolAPY ≈ 0.1006 + 0.03 ≈ 0.1306
+
+    // The poolAPY should be visible in the final result
+    expect(res.poolAPY).toBeCloseTo(0.03, 2)
+    expect(res.netAPY).toBeGreaterThan(0.12)
+    expect(res.netAPY).toBeLessThan(0.14)
+
+    expect(raw.address).toBe(data.strategy.address)
+    expect(raw.debtRatio).toBe(data.lastDebtRatio.toNumber() / 10000)
+    expect(raw.netAPY).toBeGreaterThan(0)
+    expect(raw.poolAPY).toBeCloseTo(0.03, 2)
+    expect(raw.netAPY).toBeCloseTo(res.netAPY, 10)
+  })
+
 })

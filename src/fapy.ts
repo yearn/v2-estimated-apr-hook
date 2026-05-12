@@ -18,16 +18,17 @@ export interface VaultAPY {
   keepVelo?: number;
   v3OracleCurrentAPR?: number;
   v3OracleStratRatioAPR?: number;
+  strategies?: VaultAPY[];
+  address?: string;
+  debtRatio?: number;
 }
 
-export async function computeChainAPY(
-  vault: GqlVault,
-  chainId: number,
-  strategies: Array<GqlStrategy>,
-): Promise<VaultAPY | null> {
-  const chain = getChainFromChainId(chainId)?.name?.toLowerCase();
-
-  if (!chain) return null;
+export interface ChainData {
+  gauges: Awaited<ReturnType<typeof fetchGauges>>
+  pools: Awaited<ReturnType<typeof fetchPools>>
+  subgraph: Awaited<ReturnType<typeof fetchSubgraph>>
+  fraxPools: Awaited<ReturnType<typeof fetchFraxPools>>
+}
 
   const assetAddress = vault.asset?.address as `0x${string}`;
   if (assetAddress) {
@@ -47,6 +48,32 @@ export async function computeChainAPY(
     fetchSubgraph(chainId),
     fetchFraxPools(),
   ]);
+  return { gauges, pools, subgraph, fraxPools };
+}
+
+export async function computeChainAPY(
+  vault: GqlVault,
+  chainId: number,
+  strategies: Array<GqlStrategy>,
+  chainData?: ChainData,
+): Promise<VaultAPY | null> {
+  const chain = getChainFromChainId(chainId)?.name?.toLowerCase();
+
+  if (!chain) return null;
+
+  const assetAddress = vault.asset?.address as `0x${string}`;
+  if (assetAddress) {
+    const [, isVeloLike] = await isVeloLikeVault(chainId, assetAddress);
+    if (isVeloLike) {
+      return await computeVeloLikeForwardAPY({
+        vault,
+        allStrategiesForVault: strategies,
+        chainId,
+      });
+    }
+  }
+
+  const { gauges, pools, subgraph, fraxPools } = chainData ?? await fetchChainData(chainId);
 
   if (isCurveStrategy(vault)) {
     return await computeCurveLikeForwardAPY({

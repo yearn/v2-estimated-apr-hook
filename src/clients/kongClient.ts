@@ -76,6 +76,65 @@ export class KongClient {
   }
 
   /**
+   * Fetch multiple vaults by chainId and addresses.
+   */
+  async getVaults(chainId: number, addresses: `0x${string}`[]): Promise<GqlVault[]> {
+    const query = gql`
+      query Vaults($addresses: [String], $chainId: Int) {
+        vaults(addresses: $addresses, chainId: $chainId) {
+          accountant
+          activation
+          address
+          apiVersion
+          asset {
+            address
+            chainId
+            decimals
+            name
+            symbol
+          }
+          debts {
+            debtRatio
+            strategy
+            performanceFee
+          }
+          creditAvailable
+          debtOutstanding
+          debtRatio
+          decimals
+          depositLimit
+          guardian
+          management
+          managementFee
+          maxAvailableShares
+          name
+          performanceFee
+          pricePerShare
+          expectedReturn
+          rewards
+          symbol
+          token
+          totalAssets
+          totalDebt
+          totalIdle
+          totalSupply
+          strategies
+          yearn
+        }
+      }
+    `;
+    const res = await graphqlRequest<{ vaults: GqlVault[] }>({
+      url: this.url,
+      headers: this.headers,
+      query,
+      variables: { chainId, addresses },
+      throwOnError: false,
+    });
+    if ('errors' in res) return [];
+    return res.data.vaults ?? [];
+  }
+
+  /**
    * Fetch a strategy by chainId and address.
    */
   async getStrategy(chainId: number, address: `0x${string}`): Promise<GqlStrategy | null> {
@@ -114,6 +173,47 @@ query Strategy($chainId: Int, $address: String) {
     });
     if ('errors' in res) return null;
     return res.data.strategy;
+  }
+
+  /**
+   * Fetch all strategies for a chain.
+   */
+  async getStrategiesByChain(chainId: number): Promise<GqlStrategy[]> {
+    const query = gql`
+      query Strategies($chainId: Int) {
+        strategies(chainId: $chainId) {
+          crv
+          apiVersion
+          address
+          symbol
+          name
+          rewards
+          gauge
+          keeper
+          totalDebt
+          totalDebtUsd
+          totalIdle
+          localKeepCRV
+          performanceFee
+          totalAssets
+          totalSupply
+          decimals
+          management
+          pricePerShare
+          want
+          vault
+        }
+      }
+    `;
+    const res = await graphqlRequest<{ strategies: GqlStrategy[] }>({
+      url: this.url,
+      headers: this.headers,
+      query,
+      variables: { chainId },
+      throwOnError: false,
+    });
+    if ('errors' in res) return [];
+    return res.data.strategies ?? [];
   }
 
   /**

@@ -1,20 +1,10 @@
 import { KongClient } from './clients/kongClient';
-import { GqlStrategy } from './types/kongTypes';
+import { GqlStrategy, GqlVault } from './types/kongTypes';
 
-export async function getVaultWithStrategies(chainId: number, vaultAddress: `0x${string}`) {
-  const kong = new KongClient();
-  const vault = await kong.getVault(chainId, vaultAddress);
-
-
-  const allStrategies = await Promise.all(
-    (vault?.strategies || []).map((s) => kong.getStrategy(chainId, s as `0x${string}`)),
-  )
-
-
-  const strategies = allStrategies
+function mapStrategies(vault: GqlVault, rawStrategies: (GqlStrategy | null)[]) {
+  return rawStrategies
     .filter((s) => s !== null)
     .map((strategy) => {
-
       const debtRatio = vault?.debts?.find((d) => d.strategy === strategy.address)?.debtRatio;
 
       return {
@@ -38,6 +28,17 @@ export async function getVaultWithStrategies(chainId: number, vaultAddress: `0x$
         ...strategy,
       } as unknown as GqlStrategy;
     });
+}
+
+export async function getVaultWithStrategies(chainId: number, vaultAddress: `0x${string}`) {
+  const kong = new KongClient();
+  const vault = await kong.getVault(chainId, vaultAddress);
+
+  const allStrategies = await Promise.all(
+    (vault?.strategies || []).map((s) => kong.getStrategy(chainId, s as `0x${string}`)),
+  )
+
+  const strategies = mapStrategies(vault!, allStrategies);
 
   if (!strategies && !vault) return null;
 
@@ -45,4 +46,24 @@ export async function getVaultWithStrategies(chainId: number, vaultAddress: `0x$
     vault,
     strategies,
   };
+}
+
+export async function getVaultsWithStrategies(chainId: number, addresses: `0x${string}`[]) {
+  const kong = new KongClient();
+  const [vaults, allChainStrategies] = await Promise.all([
+    kong.getVaults(chainId, addresses),
+    kong.getStrategiesByChain(chainId),
+  ]);
+
+  const strategyByAddress = new Map(
+    allChainStrategies.map(s => [s.address?.toLowerCase(), s])
+  );
+
+  const results = vaults.map((vault) => {
+    const vaultStrategies = (vault.strategies || [])
+      .map(s => strategyByAddress.get((s as string).toLowerCase()) ?? null);
+    return { vault, strategies: mapStrategies(vault, vaultStrategies) };
+  });
+
+  return new Map(results.map(r => [r.vault.address?.toLowerCase(), r]));
 }
