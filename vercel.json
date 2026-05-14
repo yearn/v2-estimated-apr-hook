@@ -16,5 +16,6 @@
       "source": "/healthcheck",
       "destination": "/api/health"
     }
-  ]
+  ],
+  "installCommand": "yarn install --frozen-lockfile"
 }
