@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "prefer-absolute-version-dependencies": "error",
+    "prefer-absolute-version-devDependencies": "error",
+    "prefer-absolute-version-peerDependencies": "error",
+    "no-caret-version-dependencies": "error",
+    "no-caret-version-devDependencies": "error",
+    "no-caret-version-peerDependencies": "error",
+    "no-tilde-version-dependencies": "error",
+    "no-tilde-version-devDependencies": "error",
+    "no-tilde-version-peerDependencies": "error"
+  }
+}
