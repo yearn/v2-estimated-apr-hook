@@ -1,6 +1,6 @@
 import { describe, beforeEach, it, vi, expect } from 'vitest'
 import { Float } from './helpers/bignumber-float'
-import { calculateGaugeBaseAPR, computeCurveLikeForwardAPY, determineCurveKeepCRV, getPoolWeeklyAPY, getRewardsAPY } from './crv-like.forward'
+import { calculateGaugeBaseAPR, computeCurveLikeForwardAPY, determineCurveKeepCRV, getCVXPoolAPY, getPoolWeeklyAPY, getRewardsAPY } from './crv-like.forward'
 import * as forwardAPY from './crv-like.forward'
 import * as helpers from './helpers'
 import { convertFloatAPRToAPY } from './helpers/calculation.helper'
@@ -42,6 +42,8 @@ describe('crv-like.forward core helpers', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
+    process.env.RPC_URI_FOR_1 = 'http://localhost:8545'
   })
 
   it('determineCurveKeepCRV prefers strategy.localKeepCRV when present', async () => {
@@ -82,6 +84,29 @@ describe('crv-like.forward core helpers', () => {
     const res = getRewardsAPY(pool)
     const [num] = (res as any).toFloat64()
     expect(num).toBeCloseTo(0.05, 1e-9) // 1.5% + 3.5% = 5% -> 0.05
+  })
+
+  it('getCVXPoolAPY ignores expired Convex rewards periods', async () => {
+    const nowSeconds = 1_780_000_000
+    vi.useFakeTimers()
+    vi.setSystemTime(nowSeconds * 1000)
+
+    mockReadContract
+      .mockResolvedValueOnce(BigInt(387))
+      .mockResolvedValueOnce(['0xLP', '0xGauge', '0xToken', '0xRewards'])
+      .mockResolvedValueOnce(BigInt('582199014705081'))
+      .mockResolvedValueOnce(BigInt('219760210359908782'))
+      .mockResolvedValueOnce(BigInt(nowSeconds - 1))
+
+    vi.spyOn(helpers, 'getCVXForCRV' as any).mockResolvedValueOnce(new Float(1))
+
+    const result = await getCVXPoolAPY(1, hex('0xStrategy'), new Float(1))
+
+    expect(result.crvAPR.isZero()).toBe(true)
+    expect(result.cvxAPR.isZero()).toBe(true)
+    expect(result.crvAPY.isZero()).toBe(true)
+    expect(result.cvxAPY.isZero()).toBe(true)
+    expect(helpers.getCVXForCRV).not.toHaveBeenCalled()
   })
 
   it('calculateCurveForwardAPY composes pieces', async () => {
