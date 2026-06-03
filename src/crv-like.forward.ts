@@ -147,7 +147,7 @@ export async function getCVXPoolAPY(
       return { crvAPR, cvxAPR, crvAPY, cvxAPY };
     }
 
-    const [rateResult, totalSupply] = (await Promise.all([
+    const [rateResult, totalSupply, periodFinish] = (await Promise.all([
       client.readContract({
         address: crvRewardsAddress,
         abi: crvRewardsAbi,
@@ -160,7 +160,17 @@ export async function getCVXPoolAPY(
         functionName: 'totalSupply',
         args: [],
       }),
-    ])) as [bigint, bigint];
+      client.readContract({
+        address: crvRewardsAddress,
+        abi: crvRewardsAbi,
+        functionName: 'periodFinish',
+        args: [],
+      }),
+    ])) as [bigint, bigint, bigint];
+
+    if (periodFinish <= BigInt(Math.floor(Date.now() / 1000))) {
+      return { crvAPR, cvxAPR, crvAPY, cvxAPY };
+    }
 
     const rate = toNormalizedAmount(new BigNumberInt(rateResult), 18);
     const supply = toNormalizedAmount(new BigNumberInt(totalSupply), 18);
