@@ -1,3 +1,4 @@
+import { captureError, flushObservability } from '../src/observability';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import 'dotenv/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -74,6 +75,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: 'invalid payload', issues: err.issues });
     }
+    captureError(err);
+    await flushObservability();
     return res.status(500).json({ error: 'internal error' });
   }
 }
