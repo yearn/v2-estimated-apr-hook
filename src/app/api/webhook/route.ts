@@ -70,10 +70,8 @@ export async function POST(req: NextRequest) {
     const replacer = (_: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);
 
     if (outputs.length === 0) {
-      return NextResponse.json(
-        { message: 'No outputs generated for fapy computation' },
-        { status: 204 },
-      );
+      // 204 must not carry a body (NextResponse.json would throw).
+      return new NextResponse(null, { status: 204 });
     }
 
     return new NextResponse(JSON.stringify(OutputSchema.array().parse(outputs), replacer), {
