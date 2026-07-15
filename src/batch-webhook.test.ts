@@ -249,13 +249,13 @@ describe('computeFapy', () => {
 // ---- Webhook handler tests ----
 
 describe('webhook handler', () => {
-  let handler: typeof import('../api/webhook').default;
+  let POST: typeof import('./app/api/webhook/route').POST;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     process.env.KONG_SECRET = 'test-secret';
-    const mod = await import('../api/webhook');
-    handler = mod.default;
+    const mod = await import('./app/api/webhook/route');
+    POST = mod.POST;
   });
 
   function makeSignature(body: string, secret = 'test-secret') {
@@ -264,19 +264,17 @@ describe('webhook handler', () => {
     return `t=${timestamp},v1=${sig}`;
   }
 
-  function mockReqRes(body: any) {
+  function makeRequest(body: unknown, headers: Record<string, string> = {}) {
     const bodyStr = JSON.stringify(body);
-    const req = {
+    return new Request('http://localhost/api/webhook', {
       method: 'POST',
-      headers: { 'kong-signature': makeSignature(bodyStr) },
-      body,
-    };
-    const res = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-      send: vi.fn().mockReturnThis(),
-    };
-    return { req, res };
+      headers: {
+        'content-type': 'application/json',
+        'kong-signature': makeSignature(bodyStr),
+        ...headers,
+      },
+      body: bodyStr,
+    });
   }
 
   it('processes batch payload and returns 200', async () => {
@@ -294,29 +292,48 @@ describe('webhook handler', () => {
       subscription,
       vaults: [VAULT_A],
     };
-    const { req, res } = mockReqRes(body);
+    const res = await POST(makeRequest(body) as any);
 
-    await handler(req as any, res as any);
-
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status).toBe(200);
     expect(getVaultsWithStrategies).toHaveBeenCalled();
   });
 
   it('rejects requests without signature', async () => {
-    const req = { method: 'POST', headers: {}, body: {} };
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+    const res = await POST(
+      new Request('http://localhost/api/webhook', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: '{}',
+      }) as any,
+    );
 
-    await handler(req as any, res as any);
+    expect(res.status).toBe(403);
+  });
 
-    expect(res.status).toHaveBeenCalledWith(403);
+  it('returns 503 when KONG_SECRET is unset', async () => {
+    const prev = process.env.KONG_SECRET;
+    delete process.env.KONG_SECRET;
+
+    const res = await POST(
+      new Request('http://localhost/api/webhook', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'kong-signature': 't=1,v1=abc',
+        },
+        body: '{}',
+      }) as any,
+    );
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'service unavailable' });
+
+    process.env.KONG_SECRET = prev;
   });
 
   it('returns 400 for invalid payload', async () => {
-    const body = { invalid: true };
-    const { req, res } = mockReqRes(body);
+    const res = await POST(makeRequest({ invalid: true }) as any);
 
-    await handler(req as any, res as any);
-
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.status).toBe(400);
   });
 });
