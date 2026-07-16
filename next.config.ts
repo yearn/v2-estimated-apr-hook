@@ -1,15 +1,5 @@
 import type { NextConfig } from 'next';
-import path from 'node:path';
 
-/**
- * Build-time env inlining for secrets loaded by yearn-gha vercel-deploy
- * (see `.github/workflows/deploy.yml`). Keep this list in lockstep with the
- * workflow `secrets:` map — each KEY must appear in both places.
- *
- * Values present at `next build` are baked into the server bundle so the app
- * does not need Vercel project env vars at runtime. Only set keys are inlined
- * so local `|| default` fallbacks still work when a var is absent.
- */
 const INLINED_FROM_1PASSWORD = {
   KONG_SECRET: process.env.KONG_SECRET,
   CRV_GAUGE_REGISTRY_URL: process.env.CRV_GAUGE_REGISTRY_URL,
@@ -21,15 +11,11 @@ const INLINED_FROM_1PASSWORD = {
 } as const;
 
 const env = Object.fromEntries(
-  Object.entries(INLINED_FROM_1PASSWORD).flatMap(([key, value]) =>
-    value ? [[key, value]] : [],
-  ),
+  Object.entries(INLINED_FROM_1PASSWORD).flatMap(([key, value]) => (value ? [[key, value]] : [])),
 );
 
 const nextConfig: NextConfig = {
   env,
-  // Avoid picking a parent-directory lockfile as the monorepo root locally.
-  outputFileTracingRoot: path.join(__dirname),
   async rewrites() {
     return [
       { source: '/webhook', destination: '/api/webhook' },
