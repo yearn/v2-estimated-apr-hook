@@ -1,5 +1,5 @@
-import path from 'node:path';
 import type { NextConfig } from 'next';
+import path from 'node:path';
 
 /**
  * Build-time env inlining for secrets loaded by yearn-gha vercel-deploy
