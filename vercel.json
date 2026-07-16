@@ -1,21 +1,4 @@
 {
-  "functions": {
-    "api/webhook.ts": {
-      "maxDuration": 60
-    },
-    "api/health.ts": {
-      "maxDuration": 10
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/webhook",
-      "destination": "/api/webhook"
-    },
-    {
-      "source": "/healthcheck",
-      "destination": "/api/health"
-    }
-  ],
-  "installCommand": "yarn install --frozen-lockfile"
+  "framework": "nextjs",
+  "installCommand": "bun install --frozen-lockfile"
 }
