@@ -1,0 +1,32 @@
+name: Deploy to Vercel
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+concurrency:
+  group: vercel-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  deployments: write
+  pull-requests: write
+
+jobs:
+  deploy:
+    uses: yearn/yearn-gha/.github/workflows/vercel-deploy.yml@711efc3dc97f65bbf6d6045d593732a935171e32
+    with:
+      vault: webops-prod-fapy-hook
+      environment: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+      secrets: |
+        KONG_SECRET=fapy-hook/KONG_SECRET
+        CRV_GAUGE_REGISTRY_URL=fapy-hook/CRV_GAUGE_REGISTRY_URL
+        CRV_POOLS_URL=fapy-hook/CRV_POOLS_URL
+        RPC_URI_FOR_1=fapy-hook/RPC_URI_FOR_1
+        RPC_URI_FOR_10=fapy-hook/RPC_URI_FOR_10
+        RPC_URI_FOR_42161=fapy-hook/RPC_URI_FOR_42161
+        RPC_URI_FOR_8453=fapy-hook/RPC_URI_FOR_8453
+    secrets:
+      OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
