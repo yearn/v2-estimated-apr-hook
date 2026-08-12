@@ -48,7 +48,10 @@ function verifyWebhookSignature(
 export async function POST(req: NextRequest) {
   const kongSecret = process.env.KONG_SECRET;
   if (!kongSecret) {
-    console.error('KONG_SECRET is not configured');
+    const error = new Error('KONG_SECRET is not configured');
+    console.error(error.message);
+    captureError(error);
+    await flushObservability();
     return NextResponse.json({ error: 'service unavailable' }, { status: 503 });
   }
 

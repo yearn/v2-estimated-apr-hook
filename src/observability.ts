@@ -12,8 +12,19 @@ import {
 
 const SERVICE_NAME = 'fapy-hook';
 
-const endpoint =
-  process.env.OTEL_EXPORTER_OTLP_ENDPOINT || process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT;
+export function getOtlpLogsEndpoint(environment = process.env): string | undefined {
+  // Signal-specific endpoints are complete URLs. This is the form supplied by
+  // Sentry, so it must not have another `/v1/logs` appended.
+  const logsEndpoint = environment.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT;
+  if (logsEndpoint) return logsEndpoint;
+
+  // The generic endpoint is an OTLP/HTTP base URL, to which each signal path
+  // is appended as required by the OTLP environment-variable specification.
+  const endpoint = environment.OTEL_EXPORTER_OTLP_ENDPOINT;
+  return endpoint ? `${endpoint.replace(/\/$/, '')}/v1/logs` : undefined;
+}
+
+const endpoint = getOtlpLogsEndpoint();
 
 let provider: LoggerProvider | undefined;
 
@@ -24,7 +35,7 @@ if (endpoint) {
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || SERVICE_NAME,
     }),
-    processors: [new BatchLogRecordProcessor(new OTLPLogExporter())],
+    processors: [new BatchLogRecordProcessor(new OTLPLogExporter({ url: endpoint }))],
   });
   logs.setGlobalLoggerProvider(provider);
 }
@@ -49,5 +60,12 @@ export function captureError(error: unknown): void {
 
 // Serverless functions may freeze before batched logs export; flush after capture.
 export async function flushObservability(): Promise<void> {
-  await provider?.forceFlush();
+  try {
+    await provider?.forceFlush();
+  } catch (error) {
+    // The OTLP exporter rejects non-2xx responses and transport failures. Do
+    // not let a telemetry outage turn an already-handled application error
+    // into a failed webhook response.
+    console.error('failed to export OpenTelemetry logs', error);
+  }
 }
