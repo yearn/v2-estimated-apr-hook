@@ -7,3 +7,6 @@ dist/
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+# Never commit Next/transpile output under public/
+public/**/*.js
