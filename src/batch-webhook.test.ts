@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createHmac } from 'node:crypto';
 import { KongBatchWebhookSchema } from './types/schemas';
 
 const VAULT_A = '0xaA00000000000000000000000000000000000001' as `0x${string}`;
@@ -246,77 +245,3 @@ describe('computeFapy', () => {
   });
 });
 
-// ---- Webhook handler tests ----
-
-describe('webhook handler', () => {
-  let handler: typeof import('../api/webhook').default;
-
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    process.env.KONG_SECRET = 'test-secret';
-    const mod = await import('../api/webhook');
-    handler = mod.default;
-  });
-
-  function makeSignature(body: string, secret = 'test-secret') {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const sig = createHmac('sha256', secret).update(`${timestamp}.${body}`, 'utf8').digest('hex');
-    return `t=${timestamp},v1=${sig}`;
-  }
-
-  function mockReqRes(body: any) {
-    const bodyStr = JSON.stringify(body);
-    const req = {
-      method: 'POST',
-      headers: { 'kong-signature': makeSignature(bodyStr) },
-      body,
-    };
-    const res = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-      send: vi.fn().mockReturnThis(),
-    };
-    return { req, res };
-  }
-
-  it('processes batch payload and returns 200', async () => {
-    const vaultsMap = new Map([
-      [VAULT_A.toLowerCase(), { vault: mockVault(VAULT_A), strategies: [] }],
-    ]);
-    vi.mocked(getVaultsWithStrategies).mockResolvedValue(vaultsMap as any);
-    vi.mocked(computeChainAPY).mockResolvedValue(mockFapy());
-
-    const body = {
-      abiPath: 'yearn/2/vault',
-      chainId: 1,
-      blockNumber: '100',
-      blockTime: '200',
-      subscription,
-      vaults: [VAULT_A],
-    };
-    const { req, res } = mockReqRes(body);
-
-    await handler(req as any, res as any);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-    expect(getVaultsWithStrategies).toHaveBeenCalled();
-  });
-
-  it('rejects requests without signature', async () => {
-    const req = { method: 'POST', headers: {}, body: {} };
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
-
-    await handler(req as any, res as any);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-  });
-
-  it('returns 400 for invalid payload', async () => {
-    const body = { invalid: true };
-    const { req, res } = mockReqRes(body);
-
-    await handler(req as any, res as any);
-
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-});

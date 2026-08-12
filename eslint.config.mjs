@@ -6,7 +6,7 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', 'vendor/**'],
+    ignores: ['dist/**', 'node_modules/**', 'vendor/**', '.next/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

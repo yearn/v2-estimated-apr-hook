@@ -1,7 +1,9 @@
 node_modules/
 .env
-public/
+.env*.local
+.next/
 .vercel
-src/**/*.js
-src/**/*.js.map
 dist/
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts

@@ -1,10 +1,9 @@
-import { setGlobalDispatcher, Agent } from 'undici'
-import { config } from 'dotenv'
+import { config } from 'dotenv';
 
-// Load environment variables from .env file
-config()
+config();
 
-const allow = process.env.ALLOW_INSECURE_TLS
-if (allow && (allow === '1' || allow.toLowerCase() === 'true')) {
-    setGlobalDispatcher(new Agent({ connect: { rejectUnauthorized: false } }))
+// Live fapy tests hit RPC endpoints whose cert chains Node rejects by default.
+const allow = process.env.ALLOW_INSECURE_TLS;
+if (allow === '1' || allow?.toLowerCase() === 'true') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 }
