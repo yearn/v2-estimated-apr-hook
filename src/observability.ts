@@ -35,12 +35,18 @@ if (endpoint) {
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || SERVICE_NAME,
     }),
-    processors: [new BatchLogRecordProcessor(new OTLPLogExporter({ url: endpoint }))],
+    processors: [
+      new BatchLogRecordProcessor(
+        new OTLPLogExporter({ url: endpoint, timeoutMillis: 2_500 }),
+      ),
+    ],
   });
   logs.setGlobalLoggerProvider(provider);
 }
 
 export function captureError(error: unknown): void {
+  if (!provider) return;
+
   const err = error instanceof Error ? error : new Error(String(error));
   const attributes: Record<string, string> = {
     [ATTR_EXCEPTION_TYPE]: err.name,
@@ -50,7 +56,7 @@ export function captureError(error: unknown): void {
     attributes[ATTR_EXCEPTION_STACKTRACE] = err.stack;
   }
 
-  logs.getLogger(SERVICE_NAME).emit({
+  provider.getLogger(process.env.OTEL_SERVICE_NAME || SERVICE_NAME).emit({
     severityNumber: SeverityNumber.ERROR,
     severityText: 'ERROR',
     body: err.message,

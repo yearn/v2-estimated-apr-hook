@@ -8,6 +8,8 @@ import { KongBatchWebhookSchema, OutputSchema } from '@/types/schemas';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
+let reportedMissingKongSecret = false;
+
 function verifyWebhookSignature(
   signatureHeader: string,
   secret: string,
@@ -50,8 +52,11 @@ export async function POST(req: NextRequest) {
   if (!kongSecret) {
     const error = new Error('KONG_SECRET is not configured');
     console.error(error.message);
-    captureError(error);
-    await flushObservability();
+    if (!reportedMissingKongSecret) {
+      reportedMissingKongSecret = true;
+      captureError(error);
+      await flushObservability();
+    }
     return NextResponse.json({ error: 'service unavailable' }, { status: 503 });
   }
 
@@ -60,13 +65,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
   }
 
-  const rawBody = await req.text();
-
-  if (!verifyWebhookSignature(signature, kongSecret, rawBody)) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
-  }
-
   try {
+    const rawBody = await req.text();
+
+    if (!verifyWebhookSignature(signature, kongSecret, rawBody)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
+    }
+
     const body = JSON.parse(rawBody) as unknown;
     const hook = KongBatchWebhookSchema.parse(body);
     const outputs = await computeFapy(hook);
