@@ -17,8 +17,14 @@ vi.mock('@/output', () => ({
   computeFapy: vi.fn(),
 }));
 
+vi.mock('@/observability', () => ({
+  captureError: vi.fn(),
+  flushObservability: vi.fn(),
+}));
+
 import { POST } from './route';
 import { computeFapy } from '@/output';
+import { captureError, flushObservability } from '@/observability';
 
 function makeSignature(body: string, secret = SECRET) {
   const timestamp = Math.floor(Date.now() / 1000);
@@ -105,6 +111,8 @@ describe('/api/webhook route', () => {
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: 'service unavailable' });
     expect(computeFapy).not.toHaveBeenCalled();
+    expect(captureError).toHaveBeenCalledWith(expect.any(Error));
+    expect(flushObservability).toHaveBeenCalledOnce();
 
     process.env.KONG_SECRET = prev;
   });
@@ -159,5 +167,7 @@ describe('/api/webhook route', () => {
 
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'internal error' });
+    expect(captureError).toHaveBeenCalledWith(expect.any(Error));
+    expect(flushObservability).toHaveBeenCalledOnce();
   });
 });

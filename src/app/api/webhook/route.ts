@@ -2,10 +2,13 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { computeFapy } from '@/output';
+import { captureError, flushObservability } from '@/observability';
 import { KongBatchWebhookSchema, OutputSchema } from '@/types/schemas';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
+
+let reportedMissingKongSecret = false;
 
 function verifyWebhookSignature(
   signatureHeader: string,
@@ -47,7 +50,13 @@ function verifyWebhookSignature(
 export async function POST(req: NextRequest) {
   const kongSecret = process.env.KONG_SECRET;
   if (!kongSecret) {
-    console.error('KONG_SECRET is not configured');
+    const error = new Error('KONG_SECRET is not configured');
+    console.error(error.message);
+    if (!reportedMissingKongSecret) {
+      reportedMissingKongSecret = true;
+      captureError(error);
+      await flushObservability();
+    }
     return NextResponse.json({ error: 'service unavailable' }, { status: 503 });
   }
 
@@ -56,13 +65,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
   }
 
-  const rawBody = await req.text();
-
-  if (!verifyWebhookSignature(signature, kongSecret, rawBody)) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
-  }
-
   try {
+    const rawBody = await req.text();
+
+    if (!verifyWebhookSignature(signature, kongSecret, rawBody)) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
+    }
+
     const body = JSON.parse(rawBody) as unknown;
     const hook = KongBatchWebhookSchema.parse(body);
     const outputs = await computeFapy(hook);
@@ -83,6 +92,8 @@ export async function POST(req: NextRequest) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: 'invalid payload', issues: err.issues }, { status: 400 });
     }
+    captureError(err);
+    await flushObservability();
     return NextResponse.json({ error: 'internal error' }, { status: 500 });
   }
 }
