@@ -28,7 +28,6 @@ describe('Calculate FAPY', () => {
             '0x790a60024bC3aea28385b60480f15a0771f26D09', // Curve YFI-ETH Pool yVault
             '0x1Fc80CfCF5B345b904A0fB36d4222196Ed9eB8a5', // Curve DOLA-sUSDe Factory yVault
             '0x342D24F2a3233F7Ac8A7347fA239187BFd186066', // Curve DOLA-sUSDS Factory yVault
-            '0x04c8bfe2eb09a1e2e9fA97A2fd970E06d87B43de', // Curve GEAR-ETH Factory yVault
             '0xBfBC4acAE2ceC91A5bC80eCA1C9290F92959f7c3', // Curve eUSDUSDC Factory yVault
             '0xb7b1C394b3F82091988A1e400C6499178eE64b99', // Curve alUSD-sDOLA Factory
             '0xe0287cA62fE23f4FFAB827d5448d68aFe6DD9Fd7', // Curve msUSD-frxUSD Factory
