@@ -3,14 +3,15 @@ import type { NextConfig } from 'next';
 
 /**
  * Build-time env inlining for secrets loaded by yearn-gha vercel-deploy
- * (see `.github/workflows/deploy.yml`). Keep this list in lockstep with the
- * workflow `secrets:` map — each KEY must appear in both places.
+ * (see `.github/workflows/deploy.yml`). Secrets come from the Doppler
+ * `fapy-hook` project (preview config on PRs, prd config on `master`).
+ * Keep this list in lockstep with the Doppler config — each KEY must exist there.
  *
  * Values present at `next build` are baked into the server bundle so the app
  * does not need Vercel project env vars at runtime. Only set keys are inlined
  * so local `|| default` fallbacks still work when a var is absent.
  */
-const INLINED_FROM_1PASSWORD = {
+const INLINED_FROM_DOPPLER = {
   KONG_SECRET: process.env.KONG_SECRET,
   CRV_GAUGE_REGISTRY_URL: process.env.CRV_GAUGE_REGISTRY_URL,
   CRV_POOLS_URL: process.env.CRV_POOLS_URL,
@@ -21,7 +22,7 @@ const INLINED_FROM_1PASSWORD = {
 } as const;
 
 const env = Object.fromEntries(
-  Object.entries(INLINED_FROM_1PASSWORD).flatMap(([key, value]) => (value ? [[key, value]] : [])),
+  Object.entries(INLINED_FROM_DOPPLER).flatMap(([key, value]) => (value ? [[key, value]] : [])),
 );
 
 const nextConfig: NextConfig = {
