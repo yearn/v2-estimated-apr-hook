@@ -135,7 +135,7 @@ Dev server defaults to Next.js (`next dev --turbopack`). Health: `http://localho
 | `CRV_GAUGE_REGISTRY_URL` | yes (Curve path) | Curve gauges API |
 | `CRV_POOLS_URL` | yes (Curve path) | Curve pools API |
 
-See `.env.example` for a minimal template. Production secrets are pulled from the Doppler `fapy-hook` project (preview config on PRs, prd config on `master`) during Vercel deploy.
+See `.env.example` for a minimal template. Production secrets sync into the Vercel project from the Doppler `fapy-hook` project (preview config on PRs, prd config on `master`) via the Doppler→Vercel integration.
 
 ### Scripts
 
@@ -184,7 +184,7 @@ POST /webhook
 - **CI:** `.github/workflows/test.yml` runs Vitest on PRs to `master`
 - **CD:** `.github/workflows/deploy.yml` deploys via `yearn/yearn-gha` with Doppler-backed secrets (preview on PR, production on `master`)
 
-Secrets inlined at build time through `next.config.ts` so serverless handlers see them at runtime.
+Secrets sync into the Vercel project through the Doppler→Vercel integration, so serverless handlers read them from `process.env` at runtime.
 
 ## License
 
