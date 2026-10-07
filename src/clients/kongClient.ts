@@ -6,6 +6,10 @@ export type KongClientOptions = {
   headers?: Record<string, string>;
 };
 
+// Kong's vaults query returns at most 100 vaults by default. Keep each request
+// within that limit so low-TVL vaults are not dropped from APR batches.
+const VAULT_BATCH_SIZE = 100;
+
 export class KongClient {
   private url: string;
   private headers?: Record<string, string>;
@@ -80,8 +84,8 @@ export class KongClient {
    */
   async getVaults(chainId: number, addresses: `0x${string}`[]): Promise<GqlVault[]> {
     const query = gql`
-      query Vaults($addresses: [String], $chainId: Int) {
-        vaults(addresses: $addresses, chainId: $chainId) {
+      query Vaults($addresses: [String], $chainId: Int, $limit: Int) {
+        vaults(addresses: $addresses, chainId: $chainId, limit: $limit) {
           accountant
           activation
           address
@@ -123,15 +127,20 @@ export class KongClient {
         }
       }
     `;
-    const res = await graphqlRequest<{ vaults: GqlVault[] }>({
-      url: this.url,
-      headers: this.headers,
-      query,
-      variables: { chainId, addresses },
-      throwOnError: false,
-    });
-    if ('errors' in res) return [];
-    return res.data.vaults ?? [];
+    const vaults: GqlVault[] = [];
+    for (let i = 0; i < addresses.length; i += VAULT_BATCH_SIZE) {
+      const batch = addresses.slice(i, i + VAULT_BATCH_SIZE);
+      const res = await graphqlRequest<{ vaults: GqlVault[] }>({
+        url: this.url,
+        headers: this.headers,
+        query,
+        variables: { chainId, addresses: batch, limit: batch.length },
+        throwOnError: false,
+      });
+      if ('errors' in res) return [];
+      vaults.push(...(res.data.vaults ?? []));
+    }
+    return vaults;
   }
 
   /**
