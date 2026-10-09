@@ -263,4 +263,76 @@ describe('crv-like.forward core helpers', () => {
     expect(raw.netAPY).toBeCloseTo(res.netAPY, 10)
   })
 
+  describe('vault allocation weighting', () => {
+    const unit = 10n ** 18n
+    const gauge: any = {
+      gauge: '0xGauge', swap: '0xPool', swap_token: '0xAsset', lpTokenPrice: 1,
+      swap_data: { virtual_price: unit.toString() },
+      gauge_controller: { inflation_rate: '0', gauge_relative_weight: unit.toString() },
+      gauge_data: { working_supply: unit.toString() },
+    }
+
+    async function estimate(curveDebtRatio: number, convexDebtRatio: number, weeklyAPY?: number) {
+      vi.mocked(helpers.getCurveBoost).mockReset().mockResolvedValue(new Float(1))
+      vi.mocked(helpers.determineConvexKeepCRV).mockReset().mockResolvedValue(new Float(0))
+      vi.mocked(helpers.getConvexRewardAPY).mockReset().mockResolvedValue({ totalRewardsAPY: new Float(0.08) } as any)
+      mockReadContract.mockReset().mockImplementation(async ({ functionName }) => {
+        if (functionName === 'poolInfo') return ['0xLP', '0xGauge', '0xToken', '0xRewards']
+        if (functionName === 'totalSupply') return unit
+        if (functionName === 'periodFinish') return BigInt(Math.floor(Date.now() / 1000) + 86400)
+        return 0n
+      })
+      vi.mocked(helpers.getCVXForCRV).mockReset().mockResolvedValue(new Float(0))
+
+      return computeCurveLikeForwardAPY({
+        vault: {
+          chainId: 1, address: hex('0xVault'), asset: { address: '0xAsset' } as any,
+          performanceFee: 1000, managementFee: 200,
+        },
+        gauges: [gauge],
+        pools: [{ lpTokenAddress: '0xAsset', gaugeRewards: [{ APY: 4 }] } as any],
+        subgraphData: weeklyAPY == null ? [] : [{ address: '0xPool', latestWeeklyApy: weeklyAPY } as any],
+        fraxPools: [],
+        allStrategiesForVault: [
+          { chainId: 1, address: hex('0xCurve'), name: 'StrategyCurve', debtRatio: curveDebtRatio },
+          { chainId: 1, address: hex('0xConvex'), name: 'StrategyConvex', debtRatio: convexDebtRatio },
+        ],
+        chainId: 1,
+      })
+    }
+
+    it.each([
+      [0, 0], // Fully deallocated.
+      [2500, 2500], // Partly allocated across Curve and Convex.
+      [6000, 4000], // Fully allocated across Curve and Convex.
+      [10000, 0], // Fully allocated to Curve.
+      [0, 10000], // Fully allocated to Convex.
+      [6000, 6000], // Inconsistent ratios must not produce a negative idle contribution.
+    ])('adds only the unallocated pool yield: Curve %s bps, Convex %s bps', async (curveDebtRatio, convexDebtRatio) => {
+      const result = await estimate(curveDebtRatio, convexDebtRatio, 1.3)
+      const curveWeight = curveDebtRatio / 10000
+      const convexWeight = convexDebtRatio / 10000
+      const poolYield = 0.013 * Math.max(1, curveWeight + convexWeight)
+      const curveFarmAPY = (1 + (0.04 * 0.9 - 0.02) / 52) ** 52 - 1
+      const convexFarmAPY = (1 + (0.08 * 0.9 - 0.02) / 52) ** 52 - 1
+
+      expect(result?.netAPY).toBeCloseTo(poolYield + curveWeight * curveFarmAPY + convexWeight * convexFarmAPY, 12)
+      expect(result?.netAPR).toBe(result?.netAPY)
+      expect(result?.poolAPY).toBeCloseTo(poolYield, 12)
+      expect(result?.rewardsAPY).toBeCloseTo(curveWeight * 0.04 + convexWeight * 0.08, 12)
+      expect(result?.boost).toBeCloseTo(curveWeight + convexWeight, 12)
+      expect(result?.baseAPR).toBe(0)
+      expect(result?.cvxAPR).toBe(0)
+      expect(result?.strategies).toHaveLength(Number(curveDebtRatio > 0) + Number(convexDebtRatio > 0))
+      if (curveDebtRatio + convexDebtRatio === 0) expect(mockReadContract).not.toHaveBeenCalled()
+    })
+
+    it.each([undefined, 0, -1])('preserves missing, zero, or negative pool yield: %s', async (weeklyAPY) => {
+      const result = await estimate(0, 0, weeklyAPY)
+      expect(result?.netAPY).toBe((weeklyAPY ?? 0) / 100)
+      expect(result?.poolAPY).toBe(result?.netAPY)
+      expect(result?.rewardsAPY).toBe(0)
+    })
+  })
+
 })

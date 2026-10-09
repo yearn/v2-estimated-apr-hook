@@ -552,10 +552,15 @@ export async function computeCurveLikeForwardAPY({
   const fraxPool = findFraxPoolForVault(vaultAsset, fraxPools);
   const subgraphItem = findSubgraphItemForVault(gauge.swap, subgraphData);
 
+  const allocatedDebtRatio = allStrategiesForVault.reduce((total, strategy) => total + (strategy.debtRatio || 0), 0);
+  // Idle LP tokens earn pool yield, but no strategy rewards or emissions.
+  const idleRatio = toNormalizedAmount(new BigNumberInt(Math.max(0, 10000 - allocatedDebtRatio)), 4);
+  const idlePoolAPY = new Float().mul(getPoolWeeklyAPY(subgraphItem), idleRatio);
+
   let typeOf = '',
-    netAPY = new Float(0),
+    netAPY = Float.from(idlePoolAPY),
     boost = new Float(0),
-    poolAPY = new Float(0),
+    poolAPY = Float.from(idlePoolAPY),
     boostedAPR = new Float(0),
     baseAPR = new Float(0),
     cvxAPR = new Float(0),
