@@ -18,7 +18,8 @@ vi.mock('viem', async (orig) => {
 
 vi.mock('http')
 vi.mock('./utils/prices', () => ({
-  fetchErc20PriceUsd: vi.fn().mockResolvedValue({ priceUsd: 1 })
+  fetchErc20PriceUsd: vi.fn().mockResolvedValue({ priceUsd: 1 }),
+  fetchErc20PricesUsd: vi.fn(async (_chainId: number, addresses: string[]) => addresses.map(() => ({ priceUsd: 1 })))
 }))
 
 describe('velo-like.forward core helpers', () => {
@@ -27,6 +28,8 @@ describe('velo-like.forward core helpers', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('RPC_URI_FOR_10', 'http://127.0.0.1:8545')
+    vi.stubEnv('RPC_URI_FOR_8453', 'http://127.0.0.1:8545')
   })
 
   describe('isVeloVault', () => {

@@ -20,7 +20,7 @@ import { Float } from './helpers/bignumber-float';
 import { BigNumberInt, toNormalizedAmount } from './helpers/bignumber-int';
 import { CrvPool, CrvSubgraphPool, FraxPool, Gauge } from './types';
 import { GqlStrategy, GqlVault } from './types/kongTypes';
-import { fetchErc20PriceUsd } from './utils/prices';
+import { fetchErc20PriceUsd, fetchErc20PricesUsd } from './utils/prices';
 import { getChainFromChainId, getRPCUrl } from './utils/rpcs';
 
 export function isCurveStrategy(vault: { name?: string | null }) {
@@ -181,10 +181,9 @@ export async function getCVXPoolAPY(
     const crvPerUnderlyingPerYear = new Float(0).mul(crvPerUnderlying, new Float(31536000));
     const cvxPerYear = await getCVXForCRV(chainId, crvPerUnderlyingPerYear);
 
-    const [{ priceUsd: crvPrice }, { priceUsd: cvxPrice }] = await Promise.all([
-      fetchErc20PriceUsd(chainId, CRV_TOKEN_ADDRESS[chainId]),
-      fetchErc20PriceUsd(chainId, CVX_TOKEN_ADDRESS[chainId]),
-    ]);
+    const [{ priceUsd: crvPrice }, { priceUsd: cvxPrice }] = await fetchErc20PricesUsd(
+      chainId, [CRV_TOKEN_ADDRESS[chainId], CVX_TOKEN_ADDRESS[chainId]],
+    );
 
     crvAPR = new Float(0).mul(crvPerUnderlyingPerYear, new Float(crvPrice));
     cvxAPR = new Float(0).mul(cvxPerYear, new Float(cvxPrice));

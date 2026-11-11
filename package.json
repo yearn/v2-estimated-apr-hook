@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "22.x"
+    "node": "^22.23.5"
   },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "test": "ALLOW_INSECURE_TLS=1 vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
     "lint:package-json": "npmPkgJsonLint .",
