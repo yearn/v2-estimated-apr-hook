@@ -1,9 +1,22 @@
 import { config } from 'dotenv';
+import { afterEach, beforeEach, expect, vi } from 'vitest';
 
 config();
 
-// Live fapy tests hit RPC endpoints whose cert chains Node rejects by default.
-const allow = process.env.ALLOW_INSECURE_TLS;
-if (allow === '1' || allow?.toLowerCase() === 'true') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-}
+const unexpectedFetch = vi.fn(() => {
+  throw new Error('Unit tests must mock network requests.');
+});
+
+beforeEach(() => {
+  unexpectedFetch.mockClear();
+  vi.stubGlobal('fetch', unexpectedFetch);
+});
+
+afterEach(() => {
+  try {
+    expect(unexpectedFetch).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  }
+});

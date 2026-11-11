@@ -74,6 +74,10 @@ export async function POST(req: NextRequest) {
 
     const body = JSON.parse(rawBody) as unknown;
     const hook = KongBatchWebhookSchema.parse(body);
+    if (!process.env.PRICE_SERVICE_API_KEY?.trim()) {
+      console.error('PRICE_SERVICE_API_KEY is not configured');
+      return NextResponse.json({ error: 'service unavailable' }, { status: 503 });
+    }
     const outputs = await computeFapy(hook);
 
     const replacer = (_: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);

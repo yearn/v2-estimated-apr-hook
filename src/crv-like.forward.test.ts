@@ -21,7 +21,8 @@ vi.mock('viem', async (orig) => {
 
 vi.mock('http')
 vi.mock('../src/utils/prices', () => ({
-  fetchErc20PriceUsd: vi.fn().mockResolvedValue({ priceUsd: 1 })
+  fetchErc20PriceUsd: vi.fn().mockResolvedValue({ priceUsd: 1 }),
+  fetchErc20PricesUsd: vi.fn(async (_chainId: number, addresses: string[]) => addresses.map(() => ({ priceUsd: 1 })))
 }))
 
 vi.mock('../src/helpers', async (orig) => {
@@ -43,7 +44,7 @@ describe('crv-like.forward core helpers', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useRealTimers()
-    process.env.RPC_URI_FOR_1 = 'http://localhost:8545'
+    vi.stubEnv('RPC_URI_FOR_1', 'http://127.0.0.1:8545')
   })
 
   it('determineCurveKeepCRV prefers strategy.localKeepCRV when present', async () => {

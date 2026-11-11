@@ -50,6 +50,7 @@ Signature payload is `${timestamp}.${rawBody}`, HMAC-SHA256 with `KONG_SECRET`. 
 | Condition | Status |
 | --- | --- |
 | Missing `KONG_SECRET` | `503` |
+| Missing `PRICE_SERVICE_API_KEY` on an authenticated calculation | `503` |
 | Missing / invalid signature | `403` |
 | Invalid JSON / Zod failure | `400` |
 | No computable outputs | `204` (empty body) |
@@ -128,6 +129,8 @@ Dev server defaults to Next.js (`next dev --turbopack`). Health: `http://localho
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `KONG_SECRET` | yes (webhook) | HMAC secret shared with Kong |
+| `PRICE_SERVICE_API_KEY` | yes (webhook) | Server-side price-service bearer key |
+| `PRICE_SERVICE_URL` | no | Pricing origin; defaults to `https://prices.yearn.dev` |
 | `RPC_URI_FOR_1` | for Ethereum | RPC for on-chain reads |
 | `RPC_URI_FOR_10` | for Optimism | RPC for Velodrome paths |
 | `RPC_URI_FOR_8453` | for Base | RPC for Aerodrome paths |
@@ -143,12 +146,31 @@ See `.env.example` for a minimal template. Production secrets sync into the Verc
 bun run dev          # Next.js dev server
 bun run build        # production build
 bun run start        # serve production build
-bun run test         # Vitest (ALLOW_INSECURE_TLS=1)
+bun run test         # Offline Vitest suite; no RPC secrets required
 bun run test:watch   # Vitest watch mode
 bun run lint         # ESLint
 bun run format       # Prettier check
 bun run format:fix  # Prettier write
 ```
+
+## Pricing and tests
+
+Token USD prices come from authenticated `prices.yearn.dev/api/prices/spot` requests.
+Known token pairs are batched and deduplicated, matched by chain and token address,
+and used directly as humanized USD values. Missing, invalid, or unavailable prices
+retain the zero-price fallback. Kong GraphQL remains the vault/strategy source; its
+legacy `prices` field is not used because it is retired.
+The service no longer calls yDaemon for prices or uses its APR as a test oracle.
+Set `PRICE_SERVICE_API_KEY` in the `fapy-hook` Doppler `preview` and `prd` configs
+before merging/deploying this migration. An authenticated webhook returns `503`
+when that key is absent, rather than silently computing with missing credentials.
+Never put this key in a `NEXT_PUBLIC_*` variable.
+
+The default suite runs offline: routing, APR calculations, batch handling, and price
+responses use deterministic fixtures or mocks. Unexpected unmocked `fetch` calls fail
+the suite. CI needs no RPC secrets and does not disable TLS certificate verification.
+Manual chain checks remain available in `src/tests.ts` and
+`src/velo-like.manual-test.ts`; they require the relevant live services and RPC setup.
 
 ## Architecture
 

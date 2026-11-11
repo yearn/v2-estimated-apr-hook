@@ -70,6 +70,14 @@ describe('/api/webhook route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.KONG_SECRET = SECRET;
+    vi.stubEnv('PRICE_SERVICE_API_KEY', 'test-price-key');
+  });
+
+  it('returns 503 without pricing credentials instead of emitting zero-price APR', async () => {
+    vi.stubEnv('PRICE_SERVICE_API_KEY', '');
+    const res = await POST(signedRequest(validBatch));
+    expect(res.status).toBe(503);
+    expect(computeFapy).not.toHaveBeenCalled();
   });
 
   it('processes a signed batch payload and returns 200', async () => {

@@ -1,5 +1,5 @@
 import { createPublicClient, http } from 'viem';
-import { fetchErc20PriceUsd } from './utils/prices';
+import { fetchErc20PricesUsd } from './utils/prices';
 import { veloGaugeAbi } from './abis/velo-gauge.abi';
 import { veloVoterRegistryAbi } from './abis/velo-voter-registry.abi';
 import { veloStrategyAbi } from './abis/velo-strategy.abi';
@@ -202,10 +202,9 @@ export async function calculateVeloLikeStrategyAPY(
   }
 
   const assetAddress = vault.asset?.address as `0x${string}`;
-  const [{ priceUsd: poolPrice }, { priceUsd: rewardsPrice }] = await Promise.all([
-    fetchErc20PriceUsd(chainId, assetAddress),
-    fetchErc20PriceUsd(chainId, (rewardToken as `0x${string}`) ?? VELO_TOKEN_ADDRESS[chainId]),
-  ]);
+  const [{ priceUsd: poolPrice }, { priceUsd: rewardsPrice }] = await fetchErc20PricesUsd(
+    chainId, [assetAddress, (rewardToken as `0x${string}`) ?? VELO_TOKEN_ADDRESS[chainId]],
+  );
 
   const poolPriceFloat = new Float(poolPrice || 0);
   const rewardsPriceFloat = new Float(rewardsPrice || 0);

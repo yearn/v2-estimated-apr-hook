@@ -21,13 +21,3 @@ jobs:
 
       - name: Run tests
         run: bun run test
-        env:
-          ALLOW_INSECURE_TLS: '1'
-          RPC_URI_FOR_1: ${{ secrets.RPC_URI_FOR_1 }}
-          RPC_URI_FOR_10: ${{ secrets.RPC_URI_FOR_10 }}
-          RPC_URI_FOR_137: ${{ secrets.RPC_URI_FOR_137 }}
-          RPC_URI_FOR_250: ${{ secrets.RPC_URI_FOR_250 }}
-          RPC_URI_FOR_8453: ${{ secrets.RPC_URI_FOR_8453 }}
-          RPC_URI_FOR_42161: ${{ secrets.RPC_URI_FOR_42161 }}
-          RPC_URI_FOR_146: ${{ secrets.RPC_URI_FOR_146 }}
-          RPC_URI_FOR_100: ${{ secrets.RPC_URI_FOR_100 }}

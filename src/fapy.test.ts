@@ -1,200 +1,116 @@
-import { describe, expect, it } from 'vitest'
-import { computeVaultFapy } from '.'
-import { computeFapy } from './output'
-import { YearnVaultData } from './types/ydaemon'
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { computeChainAPY, fetchChainData, type ChainData } from './fapy';
+import { fetchFraxPools, fetchGauges, fetchPools, fetchSubgraph } from './crv.fetcher';
+import { computeCurveLikeForwardAPY, isCurveStrategy } from './crv-like.forward';
+import { computeVeloLikeForwardAPY, isVeloLikeVault } from './velo-like.forward';
+import type { GqlStrategy, GqlVault } from './types/kongTypes';
 
-function getYDaemonURL(chainId: number, vaultAddress: `0x${string}`) {
-    return `https://ydaemon.yearn.fi/${chainId}/vaults/${vaultAddress}`
-}
+vi.mock('./crv.fetcher', () => ({
+  fetchGauges: vi.fn(),
+  fetchPools: vi.fn(),
+  fetchSubgraph: vi.fn(),
+  fetchFraxPools: vi.fn(),
+}));
+vi.mock('./crv-like.forward', () => ({
+  isCurveStrategy: vi.fn(),
+  computeCurveLikeForwardAPY: vi.fn(),
+}));
+vi.mock('./velo-like.forward', () => ({
+  isVeloLikeVault: vi.fn(),
+  computeVeloLikeForwardAPY: vi.fn(),
+}));
 
-async function getYDaemonFAPY(chainId: number, vaultAddress: `0x${string}`) {
-    const url = getYDaemonURL(chainId, vaultAddress)
-    const res = await fetch(url)
-    const data = await res.json() as YearnVaultData
-    return data.apr.forwardAPR as YearnVaultData["apr"]["forwardAPR"]
-}
+const ADDRESS = '0x0000000000000000000000000000000000000001';
+const vault: GqlVault = {
+  chainId: 1,
+  address: ADDRESS,
+  name: 'Curve fixture vault',
+  asset: { chainId: 1, address: ADDRESS, name: 'Fixture', symbol: 'FIX', decimals: 18 },
+};
+const strategies: GqlStrategy[] = [{ chainId: 1, address: ADDRESS }];
+const chainData: ChainData = { gauges: [], pools: [], subgraph: [], fraxPools: [] };
 
-// Helper to check if two numbers are within a threshold
-function expectCloseTo(actual: number, expected: number, threshold: number = 0.001) {
-    const diff = Math.abs(actual - expected)
-    expect(diff, `Expected ${actual} to be within ${threshold} of ${expected}, but diff was ${diff}`).toBeLessThanOrEqual(threshold)
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(isVeloLikeVault).mockResolvedValue([null, false]);
+  vi.mocked(isCurveStrategy).mockReturnValue(true);
+  vi.mocked(fetchGauges).mockResolvedValue(chainData.gauges);
+  vi.mocked(fetchPools).mockResolvedValue(chainData.pools);
+  vi.mocked(fetchSubgraph).mockResolvedValue(chainData.subgraph);
+  vi.mocked(fetchFraxPools).mockResolvedValue(chainData.fraxPools);
+});
 
-describe('Calculate FAPY', () => {
-    describe.concurrent("crv like vaults", () => {
-        const vaults = [
-            '0xf165a634296800812B8B0607a75DeDdcD4D3cC88', // Curve reUSD-scrvUSD Factory
-            '0x6E9455D109202b426169F0d8f01A3332DAE160f3', // LP Yearn CRV Vault v2
-            '0x790a60024bC3aea28385b60480f15a0771f26D09', // Curve YFI-ETH Pool yVault
-            '0x1Fc80CfCF5B345b904A0fB36d4222196Ed9eB8a5', // Curve DOLA-sUSDe Factory yVault
-            '0x342D24F2a3233F7Ac8A7347fA239187BFd186066', // Curve DOLA-sUSDS Factory yVault
-            '0xBfBC4acAE2ceC91A5bC80eCA1C9290F92959f7c3', // Curve eUSDUSDC Factory yVault
-            '0xb7b1C394b3F82091988A1e400C6499178eE64b99', // Curve alUSD-sDOLA Factory
-            '0xe0287cA62fE23f4FFAB827d5448d68aFe6DD9Fd7', // Curve msUSD-frxUSD Factory
-            '0xb37094c1B5614Bd6EcE40AFb295C26F4377069d3', // Curve FRAX Factory yVault
-            '0xd6627F7dE81eB517A32F0F81537Ea2636B27B8CC' // wbeth
-        ] as const
+describe('fAPY routing without a remote reference service', () => {
+  it('routes Curve vaults with all chain inputs to the Curve calculator', async () => {
+    const expected = { netAPY: 0.05, boost: 2.5 };
+    vi.mocked(computeCurveLikeForwardAPY).mockResolvedValue(expected);
 
-        it.each(vaults)('should calculate fapy for %s', async (vaultAddress) => {
-            const chainId = 1
-            const [res, ydaemonFAPY] = await Promise.all([
-                computeVaultFapy(chainId, vaultAddress),
-                getYDaemonFAPY(chainId, vaultAddress)
-            ])
+    expect(await computeChainAPY(vault, 1, strategies)).toEqual(expected);
+    expect(computeCurveLikeForwardAPY).toHaveBeenCalledWith({
+      vault, chainId: 1, allStrategiesForVault: strategies,
+      gauges: chainData.gauges, pools: chainData.pools,
+      subgraphData: chainData.subgraph, fraxPools: chainData.fraxPools,
+    });
+    expect(fetchSubgraph).toHaveBeenCalledWith(1);
+    expect(computeVeloLikeForwardAPY).not.toHaveBeenCalled();
+  });
 
-            expect(res).toBeDefined()
+  it('uses the supplied batch chain snapshot without refetching it', async () => {
+    await computeChainAPY(vault, 1, strategies, chainData);
 
-            // Use 0.005 (50 basis points) tolerance for live API comparisons
-            // Multiple data sources (subgraph, gauge, prices) have timing/caching variance
-            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.01)
-            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.01)
-            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.01)
-            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.01)
-            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.01)
-            expectCloseTo(res?.cvxAPR ?? 0, ydaemonFAPY.composite.cvxAPR ?? 0, 0.01)
-            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.01)
+    expect(computeCurveLikeForwardAPY).toHaveBeenCalledWith(expect.objectContaining({
+      gauges: chainData.gauges, pools: chainData.pools,
+      subgraphData: chainData.subgraph, fraxPools: chainData.fraxPools,
+    }));
+    expect(fetchGauges).not.toHaveBeenCalled();
+    expect(fetchPools).not.toHaveBeenCalled();
+    expect(fetchSubgraph).not.toHaveBeenCalled();
+    expect(fetchFraxPools).not.toHaveBeenCalled();
+  });
 
-            expect(res?.strategies).toBeDefined()
-            expect(res?.strategies?.length).toBeGreaterThan(0)
-            res?.strategies?.forEach(strategy => {
-                expect(strategy.address).toMatch(/^0x[a-fA-F0-9]{40}$/)
-                expect(['crv', 'cvx', 'frax']).toContain(strategy.type)
-                expect(strategy.netAPY).toBeGreaterThan(0)
-                expect(strategy.debtRatio).toBeDefined()
-            })
-        }, 15000)
+  it.each([10, 8453])('routes a gauge-backed vault on chain %i without Curve requests', async (chainId) => {
+    const chainVault = { ...vault, chainId };
+    const expected = { netAPY: 0.03, keepVelo: 0.1 };
+    vi.mocked(isVeloLikeVault).mockResolvedValue([ADDRESS, true]);
+    vi.mocked(computeVeloLikeForwardAPY).mockResolvedValue(expected);
 
-        it('should calculate fapy for 0x27B5739e22ad9033bcBf192059122d163b60349D - Yearn yCRV Vault', async () => {
-            const chainId = 1
-            const vaultAddress = '0x27B5739e22ad9033bcBf192059122d163b60349D'
-            const [res, ydaemonFAPY] = await Promise.all([
-                computeVaultFapy(chainId, vaultAddress),
-                getYDaemonFAPY(chainId, vaultAddress)
-            ])
-            expect(res).toBeDefined();
-            expect(res?.netAPY ?? 0).toEqual(ydaemonFAPY.netAPR ?? 0);
-        })
-    })
+    expect(await computeChainAPY(chainVault, chainId, strategies)).toEqual(expected);
+    expect(isVeloLikeVault).toHaveBeenCalledWith(chainId, ADDRESS);
+    expect(computeVeloLikeForwardAPY).toHaveBeenCalledWith({
+      vault: chainVault, chainId, allStrategiesForVault: strategies,
+    });
+    expect(computeCurveLikeForwardAPY).not.toHaveBeenCalled();
+    expect(fetchGauges).not.toHaveBeenCalled();
+    expect(fetchSubgraph).not.toHaveBeenCalled();
+  });
 
+  it('does not compute an unclassified vault', async () => {
+    vi.mocked(isCurveStrategy).mockReturnValue(false);
 
-    describe.concurrent("velo like vaults", () => {
-        const vaults = [
-            '0xDdDCAeE873f2D9Df0E18a80709ef2B396d4a6EA5',
-            '0x00Cb8E36A9C40491A39e8bF2864Ed30C1B579860'
-        ] as const
+    expect(await computeChainAPY(vault, 1, strategies, chainData)).toBeNull();
+    expect(computeCurveLikeForwardAPY).not.toHaveBeenCalled();
+    expect(computeVeloLikeForwardAPY).not.toHaveBeenCalled();
+  });
 
-        it.each(vaults)('should calculate fapy for %s', async (vaultAddress) => {
-            const chainId = 10
-            const [res, ydaemonFAPY] = await Promise.all([
-                computeVaultFapy(chainId, vaultAddress),
-                getYDaemonFAPY(chainId, vaultAddress)
-            ])
+  it('does not request data for unsupported chains', async () => {
+    expect(await computeChainAPY(vault, 999999, strategies)).toBeNull();
+    expect(isVeloLikeVault).not.toHaveBeenCalled();
+    expect(fetchGauges).not.toHaveBeenCalled();
+    expect(fetchSubgraph).not.toHaveBeenCalled();
+  });
 
-            expect(res).toBeDefined()
+  it('propagates upstream data failures for the batch caller to handle', async () => {
+    vi.mocked(fetchGauges).mockRejectedValueOnce(new Error('Curve unavailable'));
 
-            // Use 0.005 (50 basis points) tolerance for live API comparisons
-            // Data sources may have timing/caching differences
-            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.01)
-            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.01)
-            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.01)
-            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.01)
-            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.01)
-            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.01)
+    await expect(computeChainAPY(vault, 1, strategies)).rejects.toThrow('Curve unavailable');
+    expect(computeCurveLikeForwardAPY).not.toHaveBeenCalled();
+  });
 
-            // Velo specific: keepVelo instead of keepCRV
-            expect(res?.keepVelo).toBeDefined()
-
-            expect(res?.strategies).toBeDefined()
-            expect(res?.strategies?.length).toBeGreaterThan(0)
-            res?.strategies?.forEach(strategy => {
-                expect(strategy.address).toMatch(/^0x[a-fA-F0-9]{40}$/)
-                expect(strategy.type).toMatch(/^v2:velo/)
-                expect(strategy.netAPY).toBeGreaterThanOrEqual(0)
-                expect(strategy.debtRatio).toBeDefined()
-            })
-        }, 15000)
-    })
-
-
-    describe.concurrent("aero like vaults", () => {
-        const vaults = [
-            '0x4d3ceBA4349ADB06d2De8EBD2F9320A61303aD81',
-            '0x31Ce9aB5A358E5c802Cc01080F29a65a14EB45b8',
-            '0x68393A804c9fe4f1c7148d37796436e450Ad98E8',
-            '0x68A0ba9EcaD98BFd16D2457E2546226e8FB7C101'
-        ] as const
-
-        it.each(vaults)('should calculate fapy for %s', async (vaultAddress) => {
-            const chainId = 8453
-            const [res, ydaemonFAPY] = await Promise.all([
-                computeVaultFapy(chainId, vaultAddress),
-                getYDaemonFAPY(chainId, vaultAddress)
-            ])
-
-            expect(res).toBeDefined()
-
-            // Use 0.005 (50 basis points) tolerance for live API comparisons
-            // Data sources may have timing/caching differences
-            expectCloseTo(res?.netAPY ?? 0, ydaemonFAPY.netAPR ?? 0, 0.01)
-            expectCloseTo(res?.boost ?? 0, ydaemonFAPY.composite.boost ?? 0, 0.01)
-            expectCloseTo(res?.poolAPY ?? 0, ydaemonFAPY.composite.poolAPY ?? 0, 0.01)
-            expectCloseTo(res?.boostedAPR ?? 0, ydaemonFAPY.composite.boostedAPR ?? 0, 0.01)
-            expectCloseTo(res?.baseAPR ?? 0, ydaemonFAPY.composite.baseAPR ?? 0, 0.01)
-            expectCloseTo(res?.rewardsAPY ?? 0, ydaemonFAPY.composite.rewardsAPR ?? 0, 0.01)
-
-            // Aero/Velo specific: keepVelo instead of keepCRV
-            expect(res?.keepVelo).toBeDefined()
-
-            expect(res?.strategies).toBeDefined()
-            expect(res?.strategies?.length).toBeGreaterThan(0)
-            res?.strategies?.forEach(strategy => {
-                expect(strategy.address).toMatch(/^0x[a-fA-F0-9]{40}$/)
-                expect(strategy.type).toMatch(/^v2:velo/)
-                expect(strategy.netAPY).toBeGreaterThanOrEqual(0)
-                expect(strategy.debtRatio).toBeDefined()
-            })
-        }, 15000)
-    })
-
-    describe('computeFapy (batch)', () => {
-        const subscription = {
-            id: 'S_TEST',
-            url: 'https://example.com/webhook',
-            abiPath: 'yearn/2/vault',
-            type: 'timeseries' as const,
-            labels: ['crv-estimated-apr', 'aero-estimated-apr', 'velo-estimated-apr'],
-        }
-
-        it('processes multiple vaults and produces outputs for each', async () => {
-            const addresses = [
-                '0xf165a634296800812B8B0607a75DeDdcD4D3cC88' as `0x${string}`,
-                '0x790a60024bC3aea28385b60480f15a0771f26D09' as `0x${string}`,
-            ]
-
-            const outputs = await computeFapy({
-                abiPath: 'yearn/2/vault',
-                chainId: 1,
-                blockNumber: 0n,
-                blockTime: 0n,
-                subscription,
-                vaults: addresses,
-            })
-
-            // Each vault should produce outputs
-            const vault1Outputs = outputs.filter(o => o.address.toLowerCase() === addresses[0].toLowerCase())
-            const vault2Outputs = outputs.filter(o => o.address.toLowerCase() === addresses[1].toLowerCase())
-
-            expect(vault1Outputs.length).toBeGreaterThan(0)
-            expect(vault2Outputs.length).toBeGreaterThan(0)
-            expect(outputs.every(o => o.label === 'crv-estimated-apr')).toBe(true)
-
-            // Verify outputs match what computeVaultFapy produces
-            for (const address of addresses) {
-                const fapy = await computeVaultFapy(1, address)
-                const vaultOutputs = outputs.filter(o => o.address.toLowerCase() === address.toLowerCase() && o.component === 'netAPY')
-                expect(vaultOutputs.length).toBeGreaterThan(0)
-                expectCloseTo(vaultOutputs[0].value ?? 0, fapy?.netAPY ?? 0, 0.01)
-            }
-        }, 30000)
-    })
-})
+  it('assembles a complete chain snapshot for a batch', async () => {
+    expect(await fetchChainData(10)).toEqual(chainData);
+    for (const source of [fetchGauges, fetchPools, fetchSubgraph, fetchFraxPools]) {
+      expect(source).toHaveBeenCalledOnce();
+    }
+    expect(fetchSubgraph).toHaveBeenCalledWith(10);
+  });
+});
