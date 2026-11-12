@@ -1,3 +1,4 @@
+import { PriceUnavailableError } from './utils/prices';
 import { KongBatchWebhook, Output, OutputSchema } from './types/schemas';
 import { getVaultsWithStrategies } from './service';
 import { ChainData, computeChainAPY, fetchChainData } from './fapy';
@@ -125,6 +126,8 @@ export async function computeFapy(hook: KongBatchWebhook): Promise<Output[]> {
     if (result.status === 'fulfilled') {
       outputs.push(...result.value);
     } else {
+      // Let the webhook return a retryable failure, never a successful empty estimate.
+      if (result.reason instanceof PriceUnavailableError) throw result.reason;
       console.error('Error processing vault in batch:', result.reason);
     }
   }

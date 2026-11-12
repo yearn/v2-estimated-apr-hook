@@ -1,3 +1,4 @@
+import { PriceUnavailableError } from '@/utils/prices';
 import { createHmac } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -166,6 +167,16 @@ describe('/api/webhook route', () => {
 
     expect(res.status).toBe(204);
     expect(await res.text()).toBe('');
+  });
+
+  it('reports unavailable prices and returns an error instead of successful APY output', async () => {
+    const error = new PriceUnavailableError('Price service HTTP 503');
+    vi.mocked(computeFapy).mockRejectedValue(error);
+    const res = await POST(signedRequest(validBatch));
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'internal error' });
+    expect(captureError).toHaveBeenCalledWith(error);
+    expect(flushObservability).toHaveBeenCalledOnce();
   });
 
   it('returns 500 when computeFapy throws a non-validation error', async () => {

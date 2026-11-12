@@ -1,3 +1,4 @@
+import { PriceUnavailableError } from './utils/prices';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { KongBatchWebhookSchema } from './types/schemas';
 
@@ -189,6 +190,18 @@ describe('computeFapy', () => {
     expect(computeChainAPY).toHaveBeenCalledWith(
       expect.anything(), 1, expect.anything(), chainData,
     );
+  });
+
+  it('fails the batch on unavailable prices so Kong can retry instead of storing fabricated APYs', async () => {
+    vi.mocked(getVaultsWithStrategies).mockResolvedValue(new Map([
+      [VAULT_A.toLowerCase(), { vault: mockVault(VAULT_A), strategies: [] }],
+      [VAULT_B.toLowerCase(), { vault: mockVault(VAULT_B), strategies: [] }],
+    ]) as any);
+    vi.mocked(computeChainAPY)
+      .mockRejectedValueOnce(new PriceUnavailableError('Price service HTTP 503'))
+      .mockResolvedValueOnce(mockFapy());
+    await expect(computeFapy(makeHook(1, [VAULT_A, VAULT_B])))
+      .rejects.toThrow(PriceUnavailableError);
   });
 
   it('skips failed vaults without failing the batch', async () => {

@@ -20,7 +20,7 @@ import { Float } from './helpers/bignumber-float';
 import { BigNumberInt, toNormalizedAmount } from './helpers/bignumber-int';
 import { CrvPool, CrvSubgraphPool, FraxPool, Gauge } from './types';
 import { GqlStrategy, GqlVault } from './types/kongTypes';
-import { fetchErc20PriceUsd, fetchErc20PricesUsd } from './utils/prices';
+import { fetchErc20PriceUsd, fetchErc20PricesUsd, PriceUnavailableError } from './utils/prices';
 import { getChainFromChainId, getRPCUrl } from './utils/rpcs';
 
 export function isCurveStrategy(vault: { name?: string | null }) {
@@ -190,7 +190,9 @@ export async function getCVXPoolAPY(
 
     crvAPY = new Float().add(new Float(0), crvAPR); // crvAPY = crvAPR
     cvxAPY = new Float().add(new Float(0), cvxAPR); // cvxAPY = cvxAPR
-  } catch { }
+  } catch (error) {
+    if (error instanceof PriceUnavailableError) throw error;
+  }
   return { crvAPR, cvxAPR, crvAPY, cvxAPY };
 }
 function getStrategyContractAbi(strategy: GqlStrategy) {
@@ -476,8 +478,7 @@ export async function calculateCurveLikeStrategyAPR(
     fetchErc20PriceUsd(chainId, CRV_TOKEN_ADDRESS[chainId]),
     Promise.resolve(getPoolPrice(gauge)),
   ]);
-  const fallbackCrvPrice = priceUsd || 0.8618; 
-  const crvPrice = new Float(fallbackCrvPrice);
+  const crvPrice = new Float(priceUsd);
   
   
   const { baseAPY } = await calculateGaugeBaseAPR(gauge, crvPrice, poolPrice, baseAssetPrice);
