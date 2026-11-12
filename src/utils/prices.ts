@@ -36,9 +36,9 @@ export async function fetchErc20PricesUsd(
     });
     if (!response.ok) throw new PriceUnavailableError(`Price service HTTP ${response.status}`);
 
-    const body = await response.json() as { coins?: Record<string, { price?: unknown }> };
+    const body = await response.json() as { coins?: Record<string, { prices?: { price?: unknown }[] }> };
     return coins.map((coin) => {
-      const price = body.coins?.[coin]?.price;
+      const price = body.coins?.[coin]?.prices?.[0]?.price;
       if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
         throw new PriceUnavailableError(`Missing or invalid USD quote for ${coin}`);
       }
