@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchErc20PriceUsd, fetchErc20PricesUsd } from './prices';
+import { fetchErc20PriceUsd, fetchErc20PricesUsd, PriceUnavailableError } from './prices';
 
 const ADDRESS = '0xaB00000000000000000000000000000000000001' as const;
 const OTHER = '0x0000000000000000000000000000000000000002' as const;
@@ -46,9 +46,9 @@ describe('price-service spot prices', () => {
     expect(JSON.parse(new URL(fetch.mock.calls[0][0]).searchParams.get('coins')!)).toEqual([id]);
   });
 
-  it.each([null, '1.25', 'not-a-price', 'Infinity', -1])('returns zero for invalid price %s', async (price) => {
+  it.each([null, '1.25', 'not-a-price', 'Infinity', -1])('rejects invalid price %s', async (price) => {
     respond({ coins: { [coin]: { price } } });
-    expect(await fetchErc20PriceUsd(1, ADDRESS)).toEqual({ priceUsd: 0 });
+    await expect(fetchErc20PriceUsd(1, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
   });
 
   it('accepts an explicit zero price', async () => {
@@ -58,27 +58,27 @@ describe('price-service spot prices', () => {
 
   it('does not use another chain or token as a replacement price', async () => {
     respond({ coins: { [`base:${ADDRESS.toLowerCase()}`]: { price: 99 }, [`ethereum:${OTHER}`]: { price: 88 } } });
-    expect(await fetchErc20PriceUsd(1, ADDRESS)).toEqual({ priceUsd: 0 });
+    await expect(fetchErc20PriceUsd(1, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
   });
 
-  it('returns zero when the service has no quote', async () => {
+  it('rejects a missing quote', async () => {
     respond({ coins: {} });
-    expect(await fetchErc20PriceUsd(1, ADDRESS)).toEqual({ priceUsd: 0 });
+    await expect(fetchErc20PriceUsd(1, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
   });
 
-  it('returns zero on an HTTP failure', async () => {
+  it('rejects an HTTP failure', async () => {
     respond({ error: 'Unavailable' }, 503);
-    expect(await fetchErc20PriceUsd(1, ADDRESS)).toEqual({ priceUsd: 0 });
+    await expect(fetchErc20PriceUsd(1, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
   });
 
-  it('returns zero on a transport failure', async () => {
+  it('rejects a transport failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network unavailable')));
-    expect(await fetchErc20PriceUsd(1, ADDRESS)).toEqual({ priceUsd: 0 });
+    await expect(fetchErc20PriceUsd(1, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
   });
 
-  it('returns zero on a malformed response', async () => {
+  it('rejects a malformed response', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not JSON')));
-    expect(await fetchErc20PriceUsd(1, ADDRESS)).toEqual({ priceUsd: 0 });
+    await expect(fetchErc20PriceUsd(1, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
   });
 
   it('requires a server-side API key', async () => {
@@ -88,7 +88,7 @@ describe('price-service spot prices', () => {
 
   it('does not fetch for an unsupported chain or an empty batch', async () => {
     vi.stubEnv('PRICE_SERVICE_API_KEY', '');
-    expect(await fetchErc20PriceUsd(999999, ADDRESS)).toEqual({ priceUsd: 0 });
+    await expect(fetchErc20PriceUsd(999999, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
     expect(await fetchErc20PricesUsd(1, [])).toEqual([]);
   });
 });

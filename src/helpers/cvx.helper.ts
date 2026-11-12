@@ -1,5 +1,5 @@
 import { createPublicClient, erc20Abi, http } from 'viem'
-import { fetchErc20PriceUsd } from '../utils/prices'
+import { fetchErc20PriceUsd, PriceUnavailableError } from '../utils/prices'
 import { CVX_TOKEN_ADDRESS, CVX_BOOSTER_ADDRESS } from './maps.helper'
 import { convexBaseStrategyAbi, cvxBoosterAbi, crvRewardsAbi } from '../abis'
 import { Float } from './bignumber-float'
@@ -164,7 +164,7 @@ export const getConvexRewardAPY = async (
           continue
         }
 
-        // Fetch price with fallback if not available
+        // Missing quotes must fail the estimate; explicit zero prices earn no rewards.
         const { priceUsd: rewardTokenPrice } = await fetchErc20PriceUsd(chainID, rewardToken)
         if (!rewardTokenPrice) {
           continue
@@ -189,6 +189,7 @@ export const getConvexRewardAPY = async (
         const rewardAPR = new Float(0).div(rewardAPRTop, rewardAPRBottom)
         totalRewardsAPR = new Float(0).add(totalRewardsAPR, rewardAPR)
       } catch (error) {
+        if (error instanceof PriceUnavailableError) throw error
         continue
       }
     }

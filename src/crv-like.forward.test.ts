@@ -1,6 +1,7 @@
 import { describe, beforeEach, it, vi, expect } from 'vitest'
 import { Float } from './helpers/bignumber-float'
 import { calculateGaugeBaseAPR, computeCurveLikeForwardAPY, determineCurveKeepCRV, getCVXPoolAPY, getPoolWeeklyAPY, getRewardsAPY } from './crv-like.forward'
+import { fetchErc20PriceUsd } from './utils/prices'
 import * as forwardAPY from './crv-like.forward'
 import * as helpers from './helpers'
 import { convertFloatAPRToAPY } from './helpers/calculation.helper'
@@ -20,7 +21,8 @@ vi.mock('viem', async (orig) => {
 })
 
 vi.mock('http')
-vi.mock('../src/utils/prices', () => ({
+vi.mock('../src/utils/prices', async (orig) => ({
+  ...await orig<typeof import('./utils/prices')>(),
   fetchErc20PriceUsd: vi.fn().mockResolvedValue({ priceUsd: 1 }),
   fetchErc20PricesUsd: vi.fn(async (_chainId: number, addresses: string[]) => addresses.map(() => ({ priceUsd: 1 })))
 }))
@@ -45,6 +47,25 @@ describe('crv-like.forward core helpers', () => {
     vi.clearAllMocks()
     vi.useRealTimers()
     vi.stubEnv('RPC_URI_FOR_1', 'http://127.0.0.1:8545')
+  })
+
+  it('does not replace an explicit zero CRV quote with the old $0.8618 fallback', async () => {
+    vi.mocked(fetchErc20PriceUsd).mockResolvedValueOnce({ priceUsd: 0 })
+    vi.mocked(helpers.getCurveBoost).mockResolvedValueOnce(new Float(2.24305))
+    const result = await forwardAPY.calculateCurveLikeStrategyAPR(
+      { performanceFee: 1000, managementFee: 0 } as any,
+      { address: hex('0xStrategy'), name: 'StrategyCurve', debtRatio: 10000, localKeepCRV: 1n } as any,
+      {
+        gauge: '0xGauge', lpTokenPrice: 1,
+        swap_data: { virtual_price: '1000000000000000000' },
+        gauge_controller: { inflation_rate: '3080982847903985532', gauge_relative_weight: '1801283344036851' },
+        gauge_data: { working_supply: '327118631452258682288496' },
+      } as any,
+      { gaugeRewards: [] } as any, undefined,
+      { latestWeeklyApy: 0.23 } as any, 1,
+    )
+    expect(result.raw.baseAPR).toBe(0)
+    expect(result.raw.netAPY).toBeCloseTo(0.0023, 12)
   })
 
   it('determineCurveKeepCRV prefers strategy.localKeepCRV when present', async () => {

@@ -104,7 +104,7 @@ Array of timeseries points:
 | `velo-estimated-apr` | Optimism Velodrome-like | `netAPR`, `netAPY`, `keepVelo` (+ `debtRatio` on strategies) |
 | `aero-estimated-apr` | Base Aerodrome-like | same as velo |
 
-Vaults that cannot be classified or computed are skipped; per-vault failures are logged and do not fail the whole batch.
+Vaults that cannot be classified or computed are skipped; ordinary per-vault failures are logged and do not fail the whole batch. Missing or invalid price quotes, HTTP errors, and price-service transport failures fail the batch with HTTP 500 and are reported to Sentry, so Kong can retry. No partial outputs are returned on a price failure. Explicit zero quotes remain valid; the service never substitutes a fixed CRV price.
 
 ## Local development
 
