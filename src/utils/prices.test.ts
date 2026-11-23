@@ -28,7 +28,7 @@ describe('price-service spot prices', () => {
     expect(parsed.origin + parsed.pathname).toBe('https://prices.yearn.dev/api/prices/spot');
     expect(JSON.parse(parsed.searchParams.get('coins')!)).toEqual([coin]);
     expect(request.headers).toEqual({ Authorization: 'Bearer test-price-key' });
-    expect(request.redirect).toBe('error');
+    expect(request.redirect).toBe('manual');
   });
 
   it('batches and deduplicates tokens while preserving requested order', async () => {
@@ -70,6 +70,11 @@ describe('price-service spot prices', () => {
 
   it('rejects a missing quote', async () => {
     respond({ coins: {} });
+    await expect(fetchErc20PriceUsd(1, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
+  });
+
+  it('rejects a redirect instead of following it', async () => {
+    respond({}, 302);
     await expect(fetchErc20PriceUsd(1, ADDRESS)).rejects.toBeInstanceOf(PriceUnavailableError);
   });
 
