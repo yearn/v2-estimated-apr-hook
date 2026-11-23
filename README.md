@@ -24,7 +24,7 @@ Batch requests process multiple vaults on the same chain in one call and share c
 | Chain IO | viem |
 | Validation | Zod |
 | Tests | Vitest |
-| Deploy | Vercel (via yearn GHA + Doppler secrets) |
+| Deploy | Cloudflare Workers via OpenNext (yearn GHA + Doppler secrets) |
 
 ## API
 

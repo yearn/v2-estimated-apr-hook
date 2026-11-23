@@ -2,7 +2,8 @@ node_modules/
 .env
 .env*.local
 .next/
-.vercel
+.wrangler/
+.open-next/
 dist/
 .DS_Store
 *.tsbuildinfo

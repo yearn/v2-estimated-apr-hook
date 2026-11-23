@@ -31,7 +31,7 @@ export async function fetchErc20PricesUsd(
     url.searchParams.set('coins', JSON.stringify([...new Set(coins)]));
     const response = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${key}` },
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) throw new PriceUnavailableError(`Price service HTTP ${response.status}`);
